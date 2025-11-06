@@ -18,25 +18,25 @@
     .audio("PoltergeistMale01.ogg")
 
     .effect("emf_spike") 
-    .time(7)
+    .time(1)
     .emf_spike(5.6)
     .duration(4)
     .audio("chair_scrape.mp3")
 
     .effect("emf_spike")
-    .time(12) 
+    .time(2) 
     .emf_spike(5.9)
     .duration(5)
     .audio("door_slam.mp3")
 
     .effect("emf_spike")
-    .time(18)
+    .time(3)
     .emf_spike(5.3) 
     .duration(4)
     .audio("heavy_breathing.mp3")
 
     .effect("emf_spike")
-    .time(24)
+    .time(4)
     .emf_spike(5.8)
     .duration(6)
     .audio("angry_voice.mp3"),
