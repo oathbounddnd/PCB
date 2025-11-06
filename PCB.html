@@ -1457,6 +1457,25 @@
         gpsMsg.classList.remove('show');
       }, 3000);
     }
+
+// --- Player movement / room entry handler ---
+function onPlayerEntersRoom(roomName) {
+  currentRoom = roomName;
+  console.log(`Player entered room: ${roomName}`);
+
+  // Notify ghost trigger system
+  triggerGhostEvent('player_enters_room', { room: roomName });
+
+  // Optional: update Spirit Cam text
+  const camLabel = document.getElementById('spiritCamRoom');
+  if (camLabel) camLabel.textContent = roomName;
+
+  // If we're in the ghost's room and on Spirit Cam, enable orbs
+  if (ghost_info && roomName === ghost_info.location) {
+    console.log('Entered ghost room → triggering ghost room effects.');
+  }
+}
+
     
     function startRoomTimer() {
       // No delays - room is immediately ready for events
