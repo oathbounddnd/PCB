@@ -208,11 +208,16 @@
       margin: 20px 0;
       min-height: 400px;
     }
+    /* MOBILE/FIXED: make video sit underneath overlay/orbs */
     .camera-feed {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
       border-radius: 12px;
+      z-index: 1;
     }
     .camera-overlay {
       position: absolute;
@@ -222,6 +227,7 @@
       height: 100%;
       pointer-events: none;
       border-radius: 12px;
+      z-index: 3;
     }
     .overlay-spirit {
       background: radial-gradient(ellipse at center, 
@@ -259,6 +265,7 @@
       transition: all 0.3s;
       flex: 1;
       max-width: 80px;
+      text-align:center;
     }
     .cam-btn.active {
       border-color: #90EE90;
@@ -285,6 +292,7 @@
       pointer-events: none;
       animation: float 10s infinite linear;
       box-shadow: 0 0 20px rgba(144, 238, 144, 0.5);
+      z-index: 4; /* ABOVE video and overlay */
     }
     .ghost-orb.spirit-mode {
       filter: blur(0.5px) brightness(1.5);
@@ -672,9 +680,9 @@
 
       <div class="cam-controls">
         <div class="cam-btn active" onclick="setCameraMode('normal')" id="btnNormal">NORMAL</div>
-        <div class="cam-btn" onclick="setCameraMode('nightvision')" id="btnNightVision">NIGHT</div>
+        <div class="cam-btn" onclick="setCameraMode('nightvision')" id="btnNightvision">NIGHT</div>
         <div class="cam-btn" onclick="setCameraMode('spirit')" id="btnSpirit">SPIRIT</div>
-        <div class="cam-btn" onclick="setCameraMode('uv')" id="btnUV">UV</div>
+        <div class="cam-btn" onclick="setCameraMode('uv')" id="btnUv">UV</div>
       </div>
     </div>
     
@@ -777,18 +785,16 @@
     let orbVisibleDuration = 60000; // 1 minute
     let orbHiddenDuration = 120000; // 2 minutes
 
-    // ===== GHOST DATA SYSTEM (JSON-based) =====
+    // ===== GHOST DATA SYSTEM =====
     let currentGhostData = null;
     let ghostTimeline = [];
     let timelinePosition = 0;
     let gameStartTime = 0;
     let ghostEventQueue = [];
     let eventProcessingInterval = null;
-
-    // ===== FILE-BASED GHOST DATA SYSTEM =====
-    let loadedGhostFiles = {}; // Store loaded files in memory
-
-    // Scenarios data (embedded for local file usage - fallback)
+    let currentGhostRoom = null;
+    
+    // Scenarios data (fallback)
     let scenariosData = {
       scenarios: {
         "100": {
@@ -810,94 +816,69 @@
       }
     };
 
-    // JSON Scenario Loading System (Legacy - silent failure)
+    // ===== HELPERS =====
+    function normalizeRoomName(name) {
+      if (!name) return '';
+      let n = name.toLowerCase().replace(/\s+/g, '_');
+      // fix your UI spelling vs JSON spelling
+      if (n === 'dinning_room') n = 'dining_room';
+      return n;
+    }
+
+    // JSON loader
     async function loadScenarioJSON(code) {
       try {
         const response = await fetch(`./scenario_${code}.json`);
-        if (!response.ok) {
-          throw new Error(`Scenario ${code} not found`);
-        }
-        const scenarioData = await response.json();
-        return scenarioData;
-      } catch (error) {
-        // Silent failure - user is using new ghost data format
+        if (!response.ok) throw new Error();
+        return await response.json();
+      } catch (e) {
         return null;
       }
     }
-    
-    // ===== NEW GHOST DATA LOADING SYSTEM =====
+
     async function loadGhostDataJSON(code) {
       try {
-        // Load from Games/ folder: Games/104.json
         const response = await fetch(`./Games/${code}.json`);
-        if (!response.ok) {
-          throw new Error(`Ghost data Games/${code}.json not found`);
-        }
+        if (!response.ok) throw new Error(`Ghost data Games/${code}.json not found`);
         const ghostDataText = await response.text();
-        
-        // Process the file content to handle the custom syntax
         const processedContent = processGhostDataSyntax(ghostDataText);
-        
-        // Parse as JSON
         const ghostData = JSON.parse(processedContent);
-        
         return ghostData;
       } catch (error) {
-        // Silent failure - no user-visible errors
         return null;
       }
     }
-    
+
     function processGhostDataSyntax(content) {
-      // Remove comment lines
       content = content.replace(/\/\/ .+\n/g, '');
       
-      // ACTUALLY PARSE the user's Sequence syntax dynamically
       if (content.includes('"timeline": new Sequence()')) {
-        // Extract the entire timeline section
         const timelineMatch = content.match(/"timeline":\s*new Sequence\(\)([\s\S]*?)(?=,\s*"triggers")/);
         
         if (timelineMatch) {
           const sequenceContent = timelineMatch[1];
           const events = [];
           
-          // Split by .effect( to find individual events
           const effectMatches = sequenceContent.split(/\.effect\(/);
           
           for (let i = 1; i < effectMatches.length; i++) {
             const eventBlock = '.effect(' + effectMatches[i];
-            
-            // Parse each property from the event block
             const event = {};
-            
-            // Extract effect type
             const effectMatch = eventBlock.match(/\.effect\("([^"]+)"\)/);
             if (effectMatch) event.effect = effectMatch[1];
-            
-            // Extract time (in minutes)
             const timeMatch = eventBlock.match(/\.time\(([\d.]+)\)/);
             if (timeMatch) event.time = parseFloat(timeMatch[1]);
-            
-            // Extract EMF spike value
             const emfMatch = eventBlock.match(/\.emf_spike\(([\d.]+)\)/);
             if (emfMatch) event.emf_spike = parseFloat(emfMatch[1]);
-            
-            // Extract duration
             const durationMatch = eventBlock.match(/\.duration\((\d+)\)/);
             if (durationMatch) event.duration = parseInt(durationMatch[1]);
-            
-            // Extract audio file
             const audioMatch = eventBlock.match(/\.audio\("([^"]+)"\)/);
             if (audioMatch) event.audio = audioMatch[1];
-            
-            // Extract volume if present
             const volumeMatch = eventBlock.match(/\.volume\("([^"]+)"\)/);
             if (volumeMatch) event.volume = volumeMatch[1];
-            
             events.push(event);
           }
           
-          // Replace the timeline section with parsed events
           content = content.replace(
             /"timeline":\s*new Sequence\(\)[\s\S]*?(?=,\s*"triggers")/,
             `"timeline": ${JSON.stringify(events)}`
@@ -905,17 +886,14 @@
         }
       }
       
-      // Handle triggers (same as before)
       content = content.replace(
         /new Sequence\(\)\.effect\("emf_spike"\)\.emf_spike\(5\.1\)\.duration\(2\)\.audio\("footsteps\.mp3"\)/g,
         JSON.stringify({ effect: "emf_spike", emf_spike: 5.1, duration: 2, audio: "footsteps.mp3" })
       );
-      
       content = content.replace(
         /new Sequence\(\)\.effect\("emf_spike"\)\.emf_spike\(2\.8\)\.duration\(3\)\.audio\("door_creak\.mp3"\)/g,
         JSON.stringify({ effect: "emf_spike", emf_spike: 2.8, duration: 3, audio: "door_creak.mp3" })
       );
-      
       content = content.replace(
         /new Sequence\(\)\.effect\("emf_spike"\)\.emf_spike\(4\.1\)\.duration\(3\)\.audio\("male_voice_angry\.mp3"\)/g,
         JSON.stringify({ effect: "emf_spike", emf_spike: 4.1, duration: 3, audio: "male_voice_angry.mp3" })
@@ -925,20 +903,15 @@
     }
 
     async function loadScenario(code) {
-      // Try to load external JSON first
       let scenario = await loadScenarioJSON(code);
-      
-      // Fall back to embedded data if JSON fails
       if (!scenario && scenariosData.scenarios[code]) {
         scenario = scenariosData.scenarios[code];
-        // Add missing fields for embedded scenarios
         scenario.events = scenario.events || [];
         scenario.special_behaviors = scenario.special_behaviors || {};
       }
-      
       return scenario;
     }
-    // ===== UI HELPERS =====
+
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById(id).classList.add('active');
@@ -948,10 +921,10 @@
     function updateDebug() {
       document.getElementById('dbgRoomCount').textContent = availableRooms.length;
       document.getElementById('dbgCurrentRoom').textContent = currentRoom;
-      document.getElementById('dbgGhostRoom').textContent = currentGhostData ? 
-        currentGhostData.ghost_info.location : '--';
-      document.getElementById('dbgInZone').textContent = 
-        (currentGhostData && currentRoom.toLowerCase().replace(/\s+/g, '_') === currentGhostData.ghost_info.location) ? 'YES' : 'NO';
+      const ghostLoc = currentGhostData?.ghost_info?.location || '--';
+      document.getElementById('dbgGhostRoom').textContent = ghostLoc;
+      const inZone = normalizeRoomName(currentRoom) === normalizeRoomName(ghostLoc) ? 'YES' : 'NO';
+      document.getElementById('dbgInZone').textContent = inZone;
     }
 
     // ===== HOUSE CALIBRATION =====
@@ -964,7 +937,7 @@
       const status = document.getElementById('calibrationStatus');
       
       let currentProgress = 0;
-      const totalTime = 8000 + Math.random() * 4000; // 8-12 seconds
+      const totalTime = 8000 + Math.random() * 4000;
       const updateInterval = 100;
       
       status.textContent = 'Initializing electromagnetic field mapping...';
@@ -1024,7 +997,6 @@
         return;
       }
       
-      // Set default current room to first selected room (or Living Room if available)
       if (availableRooms.includes('Living Room')) {
         currentRoom = 'Living Room';
       } else {
@@ -1063,28 +1035,18 @@
     function startTravel(room) {
       if (room === currentRoom) return;
       
-      // Instant travel - no delays
       currentRoom = room;
       document.getElementById('currentRoomDisplay').textContent = currentRoom;
       
-      // Start room timer (now instant)
       startRoomTimer();
-      
-      // Trigger ghost events for room entry
       triggerGhostEvent('player_enters_room');
-      
-      // Handle Spirit Cam ghost room detection
+
       if (currentScreen === 'spiritcamScreen') {
-        const ghostRoom = currentGhostData?.ghost_info?.location;
-        const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
-        
+        const ghostRoom = normalizeRoomName(currentGhostData?.ghost_info?.location);
+        const playerInGhostRoom = normalizeRoomName(currentRoom) === ghostRoom;
         if (playerInGhostRoom) {
-          // Entered ghost room - start orbs if not already active
-          if (!ghostOrbsActive) {
-            startGhostOrbs();
-          }
+          if (!ghostOrbsActive) startGhostOrbs();
         } else {
-          // Left ghost room - stop orbs
           stopGhostOrbs();
         }
       }
@@ -1092,39 +1054,53 @@
       createRoomNavigation();
       updateDebug();
     }
-    // ===== NEW JSON EVENT SYSTEM =====
-    let currentGhostRoom = null; // Track where ghost currently is
-    let timelineCheckInterval = null;
-    
-    function getCurrentGhostRoom() {
-      // Return current ghost location (can change for mobile ghosts)
-      return currentGhostRoom || (currentGhostData ? currentGhostData.ghost_info.location : null);
+
+    // ===== PLAYER ROOM ENTRY HANDLER (FIXED) =====
+    function onPlayerEntersRoom(roomName) {
+      if (!roomName) roomName = currentRoom;
+      currentRoom = roomName;
+      console.log(`Player entered room: ${roomName}`);
+      triggerGhostEvent('player_enters_room');
+
+      const ghostRoom = normalizeRoomName(currentGhostData?.ghost_info?.location);
+      const playerRoom = normalizeRoomName(roomName);
+      if (currentScreen === 'spiritcamScreen') {
+        if (ghostRoom && playerRoom === ghostRoom) {
+          startGhostOrbs();
+        } else {
+          stopGhostOrbs();
+        }
+      }
     }
-    
+
+    function startRoomTimer() {
+      roomReadyForReadings = true;
+      evidenceActive = false;
+      roomEnterTime = Date.now();
+      
+      if (roomTimerInterval) clearInterval(roomTimerInterval);
+      if (evidenceTimer) clearTimeout(evidenceTimer);
+      
+      onPlayerEntersRoom(currentRoom);
+    }
+
+    // ===== NEW JSON EVENT SYSTEM =====
     function startTimelineSystem() {
-      // Handle new ghost data format
       if (currentGhostData && currentGhostData.timeline) {
         gameStartTime = Date.now();
         startGhostTimeline();
         return;
       }
     }
-    
-    // ===== NEW GHOST TIMELINE SYSTEM =====
+
     function startGhostTimeline() {
       if (!currentGhostData || !currentGhostData.timeline) return;
-      
-      // Timeline is now a processed array of events
       const timelineEvents = currentGhostData.timeline;
-      
-      if (!timelineEvents || !Array.isArray(timelineEvents)) {
-        return;
-      }
-      
-      // Schedule all timeline events
-      timelineEvents.forEach((event, index) => {
+      if (!Array.isArray(timelineEvents)) return;
+
+      timelineEvents.forEach((event) => {
         if (event.time !== undefined) {
-          const delay = event.time * 60 * 1000; // Convert MINUTES to milliseconds
+          const delay = event.time * 60 * 1000;
           setTimeout(() => {
             if (investigationActive) {
               executeGhostEvent(event);
@@ -1132,50 +1108,27 @@
           }, delay);
         }
       });
-      
-      // Start continuous event checking
+
       if (eventProcessingInterval) clearInterval(eventProcessingInterval);
       eventProcessingInterval = setInterval(() => {
         processGhostEventQueue();
-      }, 100); // Check every 100ms for smooth event processing
+      }, 100);
     }
-    
+
     function executeGhostEvent(event) {
-      // Silent execution - no debug messages
-      
-      // TOOL DETECTION PRINCIPLE:
-      // - Ghost events always happen on schedule (timeline continues)
-      // - But events are only DETECTABLE when correct equipment is powered on
-      // - This applies to ALL tools: EMF Reader, Spirit Box, Thermometer, UV Light, etc.
-      
-      // Check if player is in ghost room (some events only trigger there)
-      const ghostRoom = currentGhostData.ghost_info.location;
-      const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
-      
-      // EMF Spike events - only detectable if EMF reader is powered on
+      const ghostRoom = normalizeRoomName(currentGhostData?.ghost_info?.location);
+      const playerRoom = normalizeRoomName(currentRoom);
+
       if (event.effect === 'emf_spike' && event.emf_spike) {
-        if (devicePowered) {
-          triggerEMFSpike(event.emf_spike, event.duration || 3);
-        }
-        // Event still happened, just not detectable without EMF reader
+        if (devicePowered) triggerEMFSpike(event.emf_spike, event.duration || 3);
       }
-      
-      // Ghost Orbs events - only detectable if Spirit Cam is active
+
       if (event.effect === 'ghost_orbs') {
-        if (currentScreen === 'spiritcamScreen') {
+        if (playerRoom === ghostRoom && currentScreen === 'spiritcamScreen') {
           triggerGhostOrbs(event);
         }
-        // Event still happened, just not detectable without Spirit Cam
       }
-      
-      // Spirit Box events - only detectable if Spirit Box is powered on
-      // if (event.effect === 'spirit_response' && event.audio) {
-      //   if (spiritBoxPowered) {
-      //     playGhostAudio(`./Games/Audio/${event.audio}`, event.volume || 'medium');
-      //   }
-      // }
-      
-      // Auto events (these work regardless of equipment - environmental)
+
       if (event.effect === 'door_slam') {
         triggerDoorSlam();
       } else if (event.effect === 'door_creak') {
@@ -1185,119 +1138,78 @@
       } else if (event.effect === 'screen_shake') {
         triggerScreenShake();
       }
-      
-      // Ghost movement
+
       if (event.ghost_moves_to) {
         currentGhostRoom = event.ghost_moves_to;
       }
-      
-      // Audio events - tool-specific detection
+
       if (event.audio) {
         const audioPath = `./Games/Audio/${event.audio}`;
         const volume = event.volume || 'medium';
-        
-        // Only play EMF-related audio if EMF reader is on
         if (event.effect === 'emf_spike' && devicePowered) {
           playGhostAudio(audioPath, volume);
         } else if (event.effect !== 'emf_spike') {
-          // Non-EMF audio plays regardless (environmental sounds)
           playGhostAudio(audioPath, volume);
         }
       }
     }
-    
-    // ===== AUDIO PLAYBACK SYSTEM =====
+
     function playGhostAudio(audioPath, volume = 'medium') {
       try {
         const audio = new Audio(audioPath);
-        
-        // Set volume based on level
         switch(volume.toLowerCase()) {
-          case 'quiet':
-            audio.volume = 0.3;
-            break;
-          case 'medium':
-            audio.volume = 0.6;
-            break;
-          case 'loud':
-            audio.volume = 0.9;
-            break;
-          default:
-            audio.volume = 0.6;
+          case 'quiet': audio.volume = 0.3; break;
+          case 'medium': audio.volume = 0.6; break;
+          case 'loud': audio.volume = 0.9; break;
+          default: audio.volume = 0.6;
         }
-        
-        // Play the audio
-        audio.play().catch(error => {
-          // Silent failure - no visual indicators
-        });
-        
-        // Clean up after audio ends
-        audio.addEventListener('ended', () => {
-          audio.src = '';
-        });
-        
-      } catch (error) {
-        // Silent failure - no visual indicators
-      }
+        audio.play().catch(()=>{});
+        audio.addEventListener('ended', () => { audio.src = ''; });
+      } catch (e) {}
     }
-    
+
     function processGhostEventQueue() {
-      // Process any queued events (for future trigger system)
       while (ghostEventQueue.length > 0) {
         const event = ghostEventQueue.shift();
         executeGhostEvent(event);
       }
     }
-    
+
     // ===== GHOST EVENT FUNCTIONS =====
     function triggerEMFSpike(value, duration = 3) {
-      if (!devicePowered) return; // Only work if EMF reader is on
-      
-      // Store original EMF value
+      if (!devicePowered) return;
       const originalEMF = currentEMF;
-      
-      // Set EMF to spike value
       currentEMF = value;
       updateEMFDisplay(currentEMF);
-      
-      // Turn on anomaly LED
       document.getElementById('anomalyLed').classList.add('on');
-      
-      // Restore normal EMF after duration
       setTimeout(() => {
         currentEMF = originalEMF;
         updateEMFDisplay(currentEMF);
         document.getElementById('anomalyLed').classList.remove('on');
       }, duration * 1000);
     }
-    
+
     function triggerDoorSlam() {
-      // Auto plays sound + EMF 4.2 + shake
       triggerEMFSpike(4.2, 2);
       triggerScreenShake();
       playGhostAudio('./Games/Audio/door_slam.mp3', 'loud');
     }
-    
     function triggerDoorCreak() {
-      // Auto plays sound + EMF 2.8
       triggerEMFSpike(2.8, 3);
       playGhostAudio('./Games/Audio/door_creak.mp3', 'medium');
     }
-    
     function triggerLightsFlicker() {
-      // Auto flickers for 3 seconds
       const body = document.body;
       let flickerCount = 0;
       const flickerInterval = setInterval(() => {
         body.style.filter = flickerCount % 2 === 0 ? 'brightness(0.3)' : 'brightness(1)';
         flickerCount++;
-        if (flickerCount >= 6) { // 3 seconds of flickering
+        if (flickerCount >= 6) {
           clearInterval(flickerInterval);
           body.style.filter = 'brightness(1)';
         }
       }, 500);
     }
-    
     function triggerScreenShake() {
       const body = document.body;
       body.style.animation = 'shake 0.5s ease-in-out';
@@ -1305,358 +1217,196 @@
         body.style.animation = '';
       }, 500);
     }
-    
-    function triggerGhostOrbs(event) {
-      // Only trigger if Spirit Cam is active and player is in ghost room
-      if (currentScreen !== 'spiritcamScreen') return;
-      
-      const ghostRoom = currentGhostData.ghost_info.location;
-      const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
-      
-      if (!playerInGhostRoom) return;
-      
-      // Parse orb event parameters
-      const visibleDuration = (event.visible_duration || 1) * 60 * 1000; // Convert minutes to ms
-      const hiddenDuration = (event.hidden_duration || 2) * 60 * 1000;   // Convert minutes to ms
-      const maxOrbCount = event.max_orbs || 5;
-      
-      // Update global orb settings
-      orbVisibleDuration = visibleDuration;
-      orbHiddenDuration = hiddenDuration;
-      maxOrbs = maxOrbCount;
-      
-      // Start or restart ghost orbs system
-      if (ghostOrbsActive) {
-        stopGhostOrbs();
-      }
-      startGhostOrbs();
-    }
-    
+
     // ===== GHOST TRIGGER SYSTEM =====
     function triggerGhostEvent(triggerName) {
       if (!currentGhostData || !currentGhostData.triggers) return;
-      
       const trigger = currentGhostData.triggers[triggerName];
       if (!trigger || !Array.isArray(trigger)) return;
-      
-      // Execute a random response from the trigger array
       const randomResponse = trigger[Math.floor(Math.random() * trigger.length)];
       if (randomResponse) {
-        // Trigger response is now a processed object, not a Sequence
         executeGhostEvent(randomResponse);
       }
     }
-    
-    function checkTimelineEvents() {
-      if (!investigationActive || !currentScenario) return;
-      
-      const currentMinutes = Math.floor((Date.now() - startTime) / 60000);
-      const timelineKey = currentMinutes + '_minutes';
-      
-      if (currentScenario.TIMELINE_EVENTS[timelineKey]) {
-        const event = currentScenario.TIMELINE_EVENTS[timelineKey];
-        
-        // Only execute if player is in ghost room
-        if (currentRoom === getCurrentGhostRoom()) {
-          executeTimelineEvent(event);
-        }
-      }
-    }
-    
-    function executeTimelineEvent(event) {
-      console.log(`Timeline Event: ${event.description}`);
-      
-      // Check if this is a ghost movement event
-      if (event.ghost_moves_to) {
-        currentGhostRoom = event.ghost_moves_to;
-        console.log(`Ghost moved to: ${currentGhostRoom}`);
-      }
-      
-      // Execute the event effects
-      if (event.effects) {
-        executeEvent(event.effects);
-      }
-    }
-    
-    function executeEvent(eventData) {
-      if (!eventData.event) return;
-      
-      console.log(`Executing Event: ${eventData.event}`);
-      
-      switch(eventData.event) {
-        case 'emf_spike_minor':
-          spikeEMF(eventData.emf_spike || 5.1, (eventData.duration_seconds || 2) * 1000);
-          if (eventData.audio) playAudioFile(eventData.audio);
-          break;
-          
-        case 'emf_spike_major':
-          spikeEMF(eventData.emf_spike || 5.8, (eventData.duration_seconds || 4) * 1000);
-          if (eventData.audio) playAudioFile(eventData.audio);
-          break;
-          
-        case 'play_audio':
-          if (eventData.audio) playAudioFile(eventData.audio, eventData.volume);
-          if (eventData.emf_spike) spikeEMF(eventData.emf_spike, 3000);
-          break;
-          
-        case 'door_slam':
-          playAudioFile('door_slam.mp3', 'loud');
-          spikeEMF(4.2, 3000);
-          triggerScreenShake();
-          break;
-          
-        case 'door_creak':
-          playAudioFile('door_creak.mp3', 'quiet');
-          spikeEMF(2.8, 3000);
-          break;
-          
-        case 'lights_flicker':
-          triggerLightFlicker(eventData.duration_seconds || 3);
-          spikeEMF(3.1, 2000);
-          break;
-      }
-    }
-    
-    function spikeEMF(level, durationMs) {
-      if (!devicePowered) return;
-      
-      const originalEMF = currentEMF;
-      currentEMF = level;
-      updateEMFDisplay(currentEMF);
-      
-      // Return to baseline after duration
-      setTimeout(() => {
-        currentEMF = originalEMF;
-        updateEMFDisplay(currentEMF);
-      }, durationMs);
-    }
-    
-    function playAudioFile(filename, volume = 'medium') {
-      // Placeholder for audio system
-      console.log(`Playing audio: ${filename} at ${volume} volume`);
-      // Will implement actual audio loading/playing later
-    }
-    
-    function triggerScreenShake() {
-      document.body.style.animation = 'shake 0.5s';
-      setTimeout(() => {
-        document.body.style.animation = '';
-      }, 500);
-    }
-    
-    function triggerLightFlicker(durationSeconds) {
-      // Placeholder for light flicker effect
-      console.log(`Lights flicker for ${durationSeconds} seconds`);
-    }
-    
+
     function showGPSMessage() {
       const gpsMsg = document.getElementById('gpsMessage');
       gpsMsg.classList.add('show');
-      
       setTimeout(() => {
         gpsMsg.classList.remove('show');
       }, 3000);
     }
 
-// --- Player movement / room entry handler ---
-function onPlayerEntersRoom(roomName) {
-  currentRoom = roomName;
-  console.log(`Player entered room: ${roomName}`);
-
-  // Notify ghost trigger system
-  triggerGhostEvent('player_enters_room', { room: roomName });
-
-  // Optional: update Spirit Cam text
-  const camLabel = document.getElementById('spiritCamRoom');
-  if (camLabel) camLabel.textContent = roomName;
-
-  // If we're in the ghost's room and on Spirit Cam, enable orbs
-  if (ghost_info && roomName === ghost_info.location) {
-    console.log('Entered ghost room → triggering ghost room effects.');
-  }
-}
-
-// --- Player movement / room entry handler (safe) ---
-function onPlayerEntersRoom(roomName) {
-  // if no room was passed in, just use whatever the game thinks is current
-  if (!roomName) {
-    roomName = currentRoom;
-  }
-
-  // update global
-  currentRoom = roomName;
-
-  console.log(`Player entered room: ${roomName}`);
-
-  // fire JSON triggers like "player_enters_room"
-  // your triggerGhostEvent(...) already exists above
-  triggerGhostEvent('player_enters_room');
-
-  // check if this is the ghost's room (use currentGhostData, not ghost_info)
-  const ghostRoom = currentGhostData?.ghost_info?.location;
-  if (ghostRoom) {
-    // normalise: "Dining Room" -> "dining_room"
-    const normalisedPlayerRoom = roomName.toLowerCase().replace(/\s+/g, '_');
-    if (normalisedPlayerRoom === ghostRoom) {
-      // we're in the ghost room – this is where Spirit Cam orbs are allowed
-      // we don't have to do anything here because the orb event itself starts them
-      // but this block is now SAFE (no ReferenceError)
-      // console.log('Player entered the ghost room.');
-    }
-  }
-}
-
-    
-function startRoomTimer() {
-  // No delays - room is immediately ready for events
-  roomReadyForReadings = true;
-  evidenceActive = false;
-  roomEnterTime = Date.now();
-  
-  // Clear any existing timers
-  if (roomTimerInterval) clearInterval(roomTimerInterval);
-  if (evidenceTimer) clearTimeout(evidenceTimer);
-  
-  // Trigger room entry for JSON script system
-  // pass the actual currentRoom so we don't get "undefined"
-  onPlayerEntersRoom(currentRoom);
-}
-
-    
-    function startEvidenceTimer() {
-      if (!currentScenario) return;
+    // ===== SPIRIT CAM =====
+    async function initializeCamera() {
+      const statusElement = document.getElementById('camStatus');
+      const videoElement = document.getElementById('cameraFeed');
       
-      // Calculate evidence delay based on aggressiveness (10s-60s)
-      const baseDelay = 10000; // 10 seconds minimum
-      const maxDelay = 60000; // 60 seconds maximum
-      const aggressiveness = currentScenario.aggressiveness || 0.5;
-      
-      // More aggressive = faster evidence (inverted)
-      const delay = baseDelay + ((1 - aggressiveness) * (maxDelay - baseDelay));
-      
-      evidenceTimer = setTimeout(() => {
-        if (currentRoom === currentScenario.room && roomReadyForReadings) {
-          evidenceActive = true;
-          // Could trigger visual/audio evidence here in future
-        }
-      }, delay);
-    }
-
-    function startGhostActivity() {
-      if (!currentScenario || !investigationActive) return;
-      
-      // Only start activity for ghosts with EMF evidence
-      if (!currentScenario.has_emf) return;
-      
-      ghostActivityActive = true;
-      scheduleScenarioEvents();
-    }
-
-    function scheduleScenarioEvents() {
-      if (!ghostActivityActive || !currentScenario) return;
-      
-      // Clear any existing timers
-      if (ghostEventTimer) clearTimeout(ghostEventTimer);
-      
-      // Use JSON event timeline if available, otherwise fall back to old system
-      if (currentScenario.events && currentScenario.events.length > 0) {
-        scheduleJSONEvents();
-      } else {
-        scheduleClassBasedEvents(); // Fallback for embedded scenarios
-      }
-    }
-
-    function scheduleJSONEvents() {
-      const events = currentScenario.events;
-      
-      events.forEach(event => {
-        const delayMs = event.time_seconds * 1000;
-        
-        setTimeout(() => {
-          if (ghostActivityActive && investigationActive) {
-            triggerJSONEvent(event);
+      try {
+        statusElement.textContent = 'Requesting camera access...';
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           }
-        }, delayMs);
-      });
-    }
+        });
+        videoElement.srcObject = cameraStream;
+        statusElement.textContent = 'Camera active - Scanning for paranormal activity...';
+        
+        const ghostRoom = normalizeRoomName(currentGhostData?.ghost_info?.location);
+        const playerInGhostRoom = normalizeRoomName(currentRoom) === ghostRoom;
+        if (playerInGhostRoom) startGhostOrbs();
 
-    function scheduleClassBasedEvents() {
-      // Fallback to old random system for embedded scenarios
-      const classLevel = currentScenario.class_level || 2;
-      let minMinutes, maxMinutes;
-      
-      switch(classLevel) {
-        case 1: minMinutes = 8; maxMinutes = 15; break;
-        case 2: minMinutes = 5; maxMinutes = 12; break;
-        case 3: minMinutes = 3; maxMinutes = 8; break;
-        case 4: minMinutes = 2; maxMinutes = 6; break;
-        case 5: minMinutes = 1; maxMinutes = 4; break;
-        default: minMinutes = 5; maxMinutes = 12; break;
+      } catch (error) {
+        statusElement.textContent = 'Camera access denied - Using simulated feed';
+        videoElement.style.background = 'linear-gradient(45deg, #1a1a1a, #2a2a2a)';
+        const ghostRoom = normalizeRoomName(currentGhostData?.ghost_info?.location);
+        const playerInGhostRoom = normalizeRoomName(currentRoom) === ghostRoom;
+        if (playerInGhostRoom) startGhostOrbs();
       }
-      
-      const randomMinutes = minMinutes + Math.random() * (maxMinutes - minMinutes);
-      const delayMs = randomMinutes * 60 * 1000;
-      
-      ghostEventTimer = setTimeout(() => {
-        triggerGhostEvent();
-        scheduleClassBasedEvents(); // Schedule next random event
-      }, delayMs);
     }
 
-    function triggerJSONEvent(event) {
-      if (!currentScenario || !devicePowered || !roomReadyForReadings) return;
-      if (currentRoom !== currentScenario.room) return;
-      if (!currentScenario.has_emf) return;
+    function setCameraMode(mode) {
+      cameraMode = mode;
+      const overlay = document.getElementById('cameraOverlay');
+      const allBtns = document.querySelectorAll('.cam-btn');
+      allBtns.forEach(btn => btn.classList.remove('active'));
+
+      if (mode === 'normal') document.getElementById('btnNormal').classList.add('active');
+      if (mode === 'nightvision') document.getElementById('btnNightvision').classList.add('active');
+      if (mode === 'spirit') document.getElementById('btnSpirit').classList.add('active');
+      if (mode === 'uv') document.getElementById('btnUv').classList.add('active');
+
+      overlay.className = 'camera-overlay';
       
-      // Execute the specific event from JSON
-      switch(event.type) {
-        case 'emf_spike':
-          forceEMFSpike(event.intensity, event.duration_ms);
-          console.log(`EMF Event: ${event.description} (${event.intensity} EMF for ${event.duration_ms}ms)`);
+      switch(mode) {
+        case 'nightvision':
+          overlay.classList.add('overlay-nightvision');
           break;
-        // Future: Add other event types like 'spirit_box_response', 'camera_interference', etc.
+        case 'spirit':
+          overlay.classList.add('overlay-spirit');
+          break;
+        case 'uv':
+          overlay.classList.add('overlay-uv');
+          toggleFlashlight(true);
+          break;
+        default:
+          toggleFlashlight(false);
       }
+
+      if (mode !== 'uv') {
+        toggleFlashlight(false);
+      }
+
+      updateOrbsForMode(mode);
+    }
+    
+    function toggleFlashlight(state) {
+      if (!cameraStream) return;
+      const track = cameraStream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
+      if (capabilities.torch) {
+        track.applyConstraints({ advanced: [{ torch: state }] }).catch(()=>{});
+      }
+      flashlightOn = state;
     }
 
-    function triggerGhostEvent() {
-      if (!currentScenario || !devicePowered || !roomReadyForReadings) return;
-      
-      // Only trigger if player is in ghost room
-      if (currentRoom !== currentScenario.room) return;
-      
-      // Only trigger for ghosts with EMF evidence
-      if (!currentScenario.has_emf) return;
-      
-      // Create EMF spike event
-      const spikeIntensity = Math.random() * 0.8 + 0.2; // 0.2 to 1.0
-      const targetEMF = 5.0 + (spikeIntensity * 1.0); // 5.0 to 6.0 EMF spike
-      
-      // Force EMF spike for event
-      forceEMFSpike(targetEMF, 2000 + Math.random() * 3000); // 2-5 second spike
+    // ===== GHOST ORBS SYSTEM =====
+    function startGhostOrbs() {
+      if (ghostOrbsActive) return;
+      ghostOrbsActive = true;
+      orbsVisibilityState = true;
+      createGhostOrbs();
+      orbsLoop = setTimeout(() => {
+        orbsVisibilityLoop();
+      }, orbVisibleDuration);
     }
-
-    function forceEMFSpike(targetValue, durationMs) {
-      const originalEMF = currentEMF;
-      
-      // Rapidly increase to spike value
-      currentEMF = targetValue;
-      updateEMFDisplay(currentEMF);
-      
-      // Hold spike for duration, then return to normal
-      setTimeout(() => {
-        currentEMF = originalEMF;
-        updateEMFDisplay(currentEMF);
-      }, durationMs);
+    
+    function stopGhostOrbs() {
+      ghostOrbsActive = false;
+      orbsVisibilityState = false;
+      if (orbsLoop) {
+        clearTimeout(orbsLoop);
+        orbsLoop = null;
+      }
+      hideAllOrbs();
     }
-
-    function stopGhostActivity() {
-      ghostActivityActive = false;
-      if (ghostEventTimer) {
-        clearTimeout(ghostEventTimer);
-        ghostEventTimer = null;
+    
+    function orbsVisibilityLoop() {
+      if (!ghostOrbsActive) return;
+      if (orbsVisibilityState) {
+        orbsVisibilityState = false;
+        hideAllOrbs();
+        orbsLoop = setTimeout(() => {
+          orbsVisibilityLoop();
+        }, orbHiddenDuration);
+      } else {
+        orbsVisibilityState = true;
+        createGhostOrbs();
+        orbsLoop = setTimeout(() => {
+          orbsVisibilityLoop();
+        }, orbVisibleDuration);
       }
     }
     
+    function createGhostOrbs() {
+      if (!orbsVisibilityState || cameraMode === 'uv') return;
+      hideAllOrbs();
+      const viewport = document.querySelector('.camera-viewport');
+      if (!viewport) return;
+      const numOrbs = Math.floor(Math.random() * maxOrbs) + 1;
+      for (let i = 0; i < numOrbs; i++) {
+        setTimeout(() => {
+          if (orbsVisibilityState && ghostOrbsActive) {
+            createSingleOrb(viewport);
+          }
+        }, Math.random() * 2000);
+      }
+    }
+    
+    function createSingleOrb(viewport) {
+      const orb = document.createElement('div');
+      orb.className = 'ghost-orb';
+      const size = Math.random() * 20 + 10;
+      orb.style.width = size + 'px';
+      orb.style.height = size + 'px';
+      let opacity = Math.random() * 0.6 + 0.2;
+      if (cameraMode === 'spirit') {
+        opacity *= 1.5;
+        orb.classList.add('spirit-mode');
+      }
+      orb.style.opacity = Math.min(opacity, 1);
+      const randomX = (Math.random() - 0.5) * 100;
+      orb.style.setProperty('--random-x', randomX + 'px');
+      orb.style.left = Math.random() * (viewport.clientWidth - size) + 'px';
+      orb.style.top = viewport.clientHeight + 'px';
+      viewport.appendChild(orb);
+      currentOrbs.push({ element: orb, startTime: Date.now() });
+      setTimeout(() => {
+        if (orb.parentNode) orb.parentNode.removeChild(orb);
+        const index = currentOrbs.findIndex(o => o.element === orb);
+        if (index > -1) currentOrbs.splice(index, 1);
+      }, 10000);
+    }
+    
+    function hideAllOrbs() {
+      currentOrbs.forEach(orb => {
+        if (orb.element && orb.element.parentNode) {
+          orb.element.parentNode.removeChild(orb.element);
+        }
+      });
+      currentOrbs = [];
+    }
+    
+    function updateOrbsForMode(mode) {
+      if (mode === 'uv') {
+        hideAllOrbs();
+      } else if (orbsVisibilityState && ghostOrbsActive) {
+        createGhostOrbs();
+      }
+    }
+
     // ===== INVESTIGATION =====
     async function startInvestigation() {
       const input = document.getElementById('gameCodeInput');
@@ -1675,55 +1425,37 @@ function startRoomTimer() {
         return;
       }
 
-      // Show loading message
       errorElement.style.display = 'block';
       errorElement.style.color = '#90EE90';
       errorElement.textContent = '📡 Loading scenario data...';
 
-      // Load new ghost data format only (no legacy loading)
       currentGhostData = await loadGhostDataJSON(code);
       
       if (!currentGhostData) {
-        // Show error for unknown codes
         errorElement.style.color = '#ff6666';
         errorElement.textContent = '❌ Error: Wrong Case Code';
         return;
       }
 
-      // Get ghost room from ghost data
-      let ghostRoom;
-      if (currentGhostData && currentGhostData.ghost_info) {
-        // Convert dining_room -> Dining Room for room matching
-        const rawRoom = currentGhostData.ghost_info.location;
-        ghostRoom = rawRoom.split('_').map(word => 
-          word.charAt(0).toUpperCase() + word.slice(1)
-        ).join(' ');
-        
-        // Handle common room name mappings
-        if (ghostRoom === 'Dining Room') ghostRoom = 'Dinning Room'; // Match typo in room list
-      }
+      let ghostRoom = currentGhostData.ghost_info.location;
+      // convert to display room
+      let ghostRoomDisplay = ghostRoom.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      if (ghostRoomDisplay === 'Dining Room') ghostRoomDisplay = 'Dinning Room';
       
-      // Check if ghost room is available in selected rooms
-      if (!ghostRoom || !availableRooms.includes(ghostRoom)) {
+      if (!availableRooms.includes(ghostRoomDisplay)) {
         errorElement.style.color = '#ff6666';
         errorElement.textContent = '❌ Error: Wrong Case Code';
         return;
       }
 
-      // Initialize ghost position
       currentGhostRoom = ghostRoom;
-
-      // Hide error and proceed
       errorElement.style.display = 'none';
       
       gameCode = code;
       investigationActive = true;
       startTime = Date.now();
-      
-      // Start room timer for initial room
+
       startRoomTimer();
-      
-      // Start NEW timeline system instead of old ghost activity
       startTimelineSystem();
       
       showScreen('toolScreen');
@@ -1742,13 +1474,9 @@ function startRoomTimer() {
         const m = Math.floor((s % 3600)/60);
         const sec = s % 60;
         const timeString = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-        
-        // Update both timer displays
         document.getElementById('timerDisplay').textContent = timeString;
         document.getElementById('overlayTimer').textContent = timeString;
       }, 1000);
-      
-      // Show overlay timer
       document.getElementById('timerOverlay').classList.add('active');
     }
 
@@ -1763,284 +1491,27 @@ function startRoomTimer() {
       }
     }
 
-    // ===== SPIRIT CAM FUNCTIONS =====
-    async function initializeCamera() {
-      const statusElement = document.getElementById('camStatus');
-      const videoElement = document.getElementById('cameraFeed');
-      
-      try {
-        statusElement.textContent = 'Requesting camera access...';
-        
-        // Request camera access
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            facingMode: 'environment', // Use back camera if available
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
-        });
-        
-        videoElement.srcObject = cameraStream;
-        statusElement.textContent = 'Camera active - Scanning for paranormal activity...';
-        
-        // Start ghost orbs detection in ghost room
-        const ghostRoom = currentGhostData?.ghost_info?.location;
-        const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
-        
-        if (playerInGhostRoom) {
-          startGhostOrbs();
-        }
-        
-      } catch (error) {
-        statusElement.textContent = 'Camera access denied - Using simulated feed';
-        videoElement.style.background = 'linear-gradient(45deg, #1a1a1a, #2a2a2a)';
-        
-        // Still allow ghost orbs in ghost room even without camera
-        const ghostRoom = currentGhostData?.ghost_info?.location;
-        const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
-        
-        if (playerInGhostRoom) {
-          startGhostOrbs();
-        }
-      }
-    }
-    
-    function setCameraMode(mode) {
-      cameraMode = mode;
-      const overlay = document.getElementById('cameraOverlay');
-      const allBtns = document.querySelectorAll('.cam-btn');
-      
-      // Remove active class from all buttons
-      allBtns.forEach(btn => btn.classList.remove('active'));
-      
-      // Add active class to selected button
-      document.getElementById(`btn${mode.charAt(0).toUpperCase() + mode.slice(1)}`).classList.add('active');
-      
-      // Clear existing overlay classes
-      overlay.className = 'camera-overlay';
-      
-      // Apply mode-specific styling
-      switch(mode) {
-        case 'normal':
-          // No overlay
-          break;
-        case 'nightvision':
-          overlay.classList.add('overlay-nightvision');
-          break;
-        case 'spirit':
-          overlay.classList.add('overlay-spirit');
-          break;
-        case 'uv':
-          overlay.classList.add('overlay-uv');
-          toggleFlashlight(true);
-          break;
-      }
-      
-      // Turn off flashlight for non-UV modes
-      if (mode !== 'uv') {
-        toggleFlashlight(false);
-      }
-      
-      // Update orb visibility based on mode
-      updateOrbsForMode(mode);
-    }
-    
-    function toggleFlashlight(state) {
-      if (!cameraStream) return;
-      
-      const track = cameraStream.getVideoTracks()[0];
-      const capabilities = track.getCapabilities();
-      
-      if (capabilities.torch) {
-        track.applyConstraints({
-          advanced: [{ torch: state }]
-        }).catch(e => {
-          // Flashlight not available, continue without it
-        });
-      }
-      
-      flashlightOn = state;
-    }
-
-    // ===== GHOST ORBS SYSTEM =====
-    function startGhostOrbs() {
-      if (ghostOrbsActive) return;
-      
-      ghostOrbsActive = true;
-      orbsVisibilityState = true; // Start visible
-      
-      // Create initial orbs
-      createGhostOrbs();
-      
-      // Start visibility loop: visible 1min → hidden 2min → repeat
-      orbsLoop = setTimeout(() => {
-        orbsVisibilityLoop();
-      }, orbVisibleDuration);
-    }
-    
-    function stopGhostOrbs() {
-      ghostOrbsActive = false;
-      orbsVisibilityState = false;
-      
-      if (orbsLoop) {
-        clearTimeout(orbsLoop);
-        orbsLoop = null;
-      }
-      
-      // Remove all existing orbs
-      currentOrbs.forEach(orb => {
-        if (orb.element && orb.element.parentNode) {
-          orb.element.parentNode.removeChild(orb.element);
-        }
-      });
-      currentOrbs = [];
-    }
-    
-    function orbsVisibilityLoop() {
-      if (!ghostOrbsActive) return;
-      
-      if (orbsVisibilityState) {
-        // Currently visible → hide for 2 minutes
-        orbsVisibilityState = false;
-        hideAllOrbs();
-        orbsLoop = setTimeout(() => {
-          orbsVisibilityLoop();
-        }, orbHiddenDuration);
-      } else {
-        // Currently hidden → show for 1 minute
-        orbsVisibilityState = true;
-        createGhostOrbs();
-        orbsLoop = setTimeout(() => {
-          orbsVisibilityLoop();
-        }, orbVisibleDuration);
-      }
-    }
-    
-    function createGhostOrbs() {
-      if (!orbsVisibilityState || cameraMode === 'uv') return;
-      
-      // Remove existing orbs first
-      hideAllOrbs();
-      
-      // Create random number of orbs (1 to maxOrbs)
-      const numOrbs = Math.floor(Math.random() * maxOrbs) + 1;
-      
-      for (let i = 0; i < numOrbs; i++) {
-        setTimeout(() => {
-          if (orbsVisibilityState && ghostOrbsActive) {
-            createSingleOrb();
-          }
-        }, Math.random() * 2000); // Stagger creation over 2 seconds
-      }
-    }
-    
-    function createSingleOrb() {
-      const viewport = document.querySelector('.camera-viewport');
-      if (!viewport) return;
-      
-      const orb = document.createElement('div');
-      orb.className = 'ghost-orb';
-      
-      // Random size (simulates distance)
-      const size = Math.random() * 20 + 10; // 10px to 30px
-      orb.style.width = size + 'px';
-      orb.style.height = size + 'px';
-      
-      // Random opacity (simulates brightness/distance)
-      let opacity = Math.random() * 0.6 + 0.2; // 0.2 to 0.8
-      
-      // Brighter in spirit mode
-      if (cameraMode === 'spirit') {
-        opacity *= 1.5;
-        orb.classList.add('spirit-mode');
-      }
-      
-      orb.style.opacity = Math.min(opacity, 1);
-      
-      // Random horizontal movement
-      const randomX = (Math.random() - 0.5) * 100; // -50px to 50px
-      orb.style.setProperty('--random-x', randomX + 'px');
-      
-      // Random starting position
-      orb.style.left = Math.random() * (viewport.clientWidth - size) + 'px';
-      orb.style.top = viewport.clientHeight + 'px';
-      
-      // Add to viewport
-      viewport.appendChild(orb);
-      
-      // Track orb
-      const orbData = {
-        element: orb,
-        startTime: Date.now()
-      };
-      currentOrbs.push(orbData);
-      
-      // Remove orb after animation (10 seconds)
-      setTimeout(() => {
-        if (orb.parentNode) {
-          orb.parentNode.removeChild(orb);
-        }
-        // Remove from tracking array
-        const index = currentOrbs.findIndex(o => o.element === orb);
-        if (index > -1) {
-          currentOrbs.splice(index, 1);
-        }
-      }, 10000);
-    }
-    
-    function hideAllOrbs() {
-      currentOrbs.forEach(orb => {
-        if (orb.element && orb.element.parentNode) {
-          orb.element.parentNode.removeChild(orb.element);
-        }
-      });
-      currentOrbs = [];
-    }
-    
-    function updateOrbsForMode(mode) {
-      if (mode === 'uv') {
-        // Hide orbs in UV mode
-        hideAllOrbs();
-      } else if (orbsVisibilityState && ghostOrbsActive) {
-        // Recreate orbs for new mode (spirit mode makes them brighter)
-        createGhostOrbs();
-      }
-    }
-
     function endInvestigation() {
       if (!confirm('End investigation?')) return;
-      
       investigationActive = false;
       gameCode = '';
       roomReadyForReadings = false;
       evidenceActive = false;
       currentGhostRoom = null;
-      
-      // Clear ghost data system
       currentGhostData = null;
       ghostTimeline = [];
       timelinePosition = 0;
       gameStartTime = 0;
       ghostEventQueue = [];
-      
-      // Clear all timers
+
       if (roomTimerInterval) clearInterval(roomTimerInterval);
       if (evidenceTimer) clearTimeout(evidenceTimer);
-      if (timelineCheckInterval) clearInterval(timelineCheckInterval);
       if (eventProcessingInterval) clearInterval(eventProcessingInterval);
       if (timerInterval) clearInterval(timerInterval);
-      
-      // Stop old ghost activity system
-      stopGhostActivity();
-      
-      // Cleanup Spirit Cam
+
       cleanupSpiritCam();
-      
       stopEMFReadings();
-      
-      // Hide overlay timer
       document.getElementById('timerOverlay').classList.remove('active');
-      
       showScreen('homeScreen');
       updateDebug();
     }
@@ -2052,47 +1523,33 @@ function startRoomTimer() {
     }
     
     function cleanupSpiritCam() {
-      // Stop camera stream
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
         cameraStream = null;
       }
-      
-      // Stop ghost orbs
       stopGhostOrbs();
-      
-      // Turn off flashlight
       toggleFlashlight(false);
     }
 
-    // ===== EMF - ENHANCED WITH BETTER CALIBRATION =====
+    // ===== EMF =====
     function updateEMFDisplay(val) {
       document.querySelector('.emf-value').textContent = val.toFixed(2);
       const needle = document.querySelector('.needle');
       if (needle) {
-        // Improved dial calibration using configurable angles
-        // Map 0–6 EMF value to emfAngleMin–emfAngleMax
-        const fraction = Math.max(0, Math.min(1, val / 6)); // Clamp 0-1
+        const fraction = Math.max(0, Math.min(1, val / 6));
         const angle = emfAngleMin + (emfAngleMax - emfAngleMin) * fraction;
-        
         needle.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
       }
-      
-      // Handle beeping and spike detection
       handleEMFEffects(val);
     }
 
     function handleEMFEffects(val) {
       const spikeIndicator = document.getElementById('spikeIndicator');
-      const spikeThreshold = 0.5; // How much change needed to trigger spike
-      
-      // Detect spikes
+      const spikeThreshold = 0.5;
       const change = Math.abs(val - lastEMFValue);
       if (change > spikeThreshold && val > 2.0) {
         triggerSpike();
       }
-      
-      // Handle sustained high readings
       if (val >= 4.0) {
         if (!spikeIndicator.classList.contains('sustained')) {
           spikeIndicator.classList.remove('flash');
@@ -2103,7 +1560,6 @@ function startRoomTimer() {
         spikeIndicator.classList.remove('sustained');
         stopBeeping();
       }
-      
       lastEMFValue = val;
     }
 
@@ -2111,8 +1567,6 @@ function startRoomTimer() {
       const spikeIndicator = document.getElementById('spikeIndicator');
       spikeIndicator.classList.remove('sustained');
       spikeIndicator.classList.add('flash');
-      
-      // Remove flash class after animation
       setTimeout(() => {
         spikeIndicator.classList.remove('flash');
       }, 300);
@@ -2120,54 +1574,37 @@ function startRoomTimer() {
 
     function handleBeeping(emfValue) {
       if (!devicePowered) return;
-      
-      // Initialize audio context on first use
       if (!audioContext) {
         try {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
         } catch (e) {
-          console.log('Audio not supported');
           return;
         }
       }
-      
-      // Calculate beep interval based on EMF value (4.0 = 1000ms, 5.5+ = 100ms)
-      const minInterval = 100; // Fastest beep (almost continuous)
-      const maxInterval = 1000; // Slowest beep at EMF 4.0
-      const emfRange = Math.max(0, Math.min(1.5, emfValue - 4.0)); // 0 to 1.5 range
+      const minInterval = 100;
+      const maxInterval = 1000;
+      const emfRange = Math.max(0, Math.min(1.5, emfValue - 4.0));
       const intervalRange = maxInterval - minInterval;
       const currentInterval = maxInterval - (emfRange / 1.5) * intervalRange;
-      
-      // Clear existing beep interval
-      if (beepInterval) {
-        clearInterval(beepInterval);
-      }
-      
-      // Start new beep interval
+
+      if (beepInterval) clearInterval(beepInterval);
       beepInterval = setInterval(() => {
         playBeep();
       }, currentInterval);
-      
-      // Play immediate beep
       playBeep();
     }
 
     function playBeep() {
       if (!audioContext || audioContext.state === 'suspended') return;
-      
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Hz beep
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
       oscillator.type = 'square';
-      
       gainNode.gain.setValueAtTime(0, audioContext.currentTime);
       gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
       gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
-      
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.1);
     }
@@ -2181,11 +1618,7 @@ function startRoomTimer() {
 
     function generateEMFReading() {
       if (!devicePowered) return;
-      
-      // Simple baseline fluctuation between 0.1 and 0.6
-      let target = 0.1 + (Math.random() * 0.5); // 0.1 to 0.6
-      
-      // Smooth transition
+      let target = 0.1 + (Math.random() * 0.5);
       currentEMF += (target - currentEMF) * 0.1;
       currentEMF = Math.max(0, Math.min(6, currentEMF));
       updateEMFDisplay(currentEMF);
@@ -2203,13 +1636,8 @@ function startRoomTimer() {
       lastEMFValue = 0.0;
       updateEMFDisplay(currentEMF);
       stopBeeping();
-      
-      // Reset spike indicator
       const spikeIndicator = document.getElementById('spikeIndicator');
-      if (spikeIndicator) {
-        spikeIndicator.classList.remove('flash', 'sustained');
-      }
-      
+      if (spikeIndicator) spikeIndicator.classList.remove('flash', 'sustained');
       document.getElementById('anomalyLed').classList.remove('on');
     }
 
@@ -2218,31 +1646,24 @@ function startRoomTimer() {
         alert('Start an investigation first');
         return;
       }
-      
       devicePowered = !devicePowered;
       const powerLed = document.getElementById('powerLed');
       const calibLed = document.getElementById('calibLed');
-      
       if (devicePowered) {
         powerLed.classList.add('on');
-        calibLed.classList.add('on'); // Already green, just ensure it's visible
+        calibLed.classList.add('on');
         startEMFReadings();
       } else {
         powerLed.classList.remove('on');
-        calibLed.classList.remove('on'); // Keep it green but dimmer
+        calibLed.classList.remove('on');
         stopEMFReadings();
       }
     }
 
-    // ===== EMF CALIBRATION FUNCTIONS (For Testing) =====
     function updateDialCalibration() {
       emfAngleMin = parseInt(document.getElementById('angleMin').value);
       emfAngleMax = parseInt(document.getElementById('angleMax').value);
-      
-      // Update current reading to reflect new calibration
-      if (devicePowered) {
-        updateEMFDisplay(currentEMF);
-      }
+      if (devicePowered) updateEMFDisplay(currentEMF);
     }
 
     function testEMFReading() {
@@ -2252,14 +1673,7 @@ function startRoomTimer() {
       updateEMFDisplay(currentEMF);
     }
 
-    // Enable calibration mode (uncomment to enable testing controls)
-    function enableCalibrationMode() {
-      document.getElementById('emfCalibration').style.display = 'block';
-    }
-
-    // ===== INIT =====
     document.addEventListener('DOMContentLoaded', function(){
-      // Code input - numeric only
       document.getElementById('gameCodeInput').addEventListener('keypress', function(e){
         if (e.key === 'Enter') startInvestigation();
         if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Enter') {
@@ -2267,26 +1681,17 @@ function startRoomTimer() {
         }
       });
       
-      // Initialize audio context on first user interaction
       document.addEventListener('click', function initAudio() {
         if (!audioContext) {
           try {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioContext.state === 'suspended') {
-              audioContext.resume();
-            }
-          } catch (e) {
-            console.log('Audio not supported');
-          }
+            if (audioContext.state === 'suspended') audioContext.resume();
+          } catch (e) {}
         }
-        // Remove listener after first click
         document.removeEventListener('click', initAudio);
       });
       
       updateDebug();
-      
-      // Uncomment this line to enable EMF calibration controls for testing:
-      // enableCalibrationMode();
     });
   </script>
 </body>
