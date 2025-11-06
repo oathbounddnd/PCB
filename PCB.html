@@ -543,11 +543,25 @@
 
     <!-- Debug Status (remove in production) -->
     <div class="ghost-status" id="ghostStatus">
-        <div><strong>Debug Info:</strong></div>
-        <div>Ghost: <span id="ghostLocation">Not generated</span></div>
+        <div><strong>DEBUG MODE:</strong></div>
+        <div><strong>Ghost Location:</strong></div>
+        <div>Lat: <span id="ghostLat">--</span></div>
+        <div>Lng: <span id="ghostLng">--</span></div>
+        <div>Alt: <span id="ghostAlt">--</span></div>
+        <div>Floor: <span id="ghostFloor">--</span></div>
+        
+        <div style="margin-top: 10px;"><strong>Your Location:</strong></div>
+        <div>Lat: <span id="playerLat">--</span></div>
+        <div>Lng: <span id="playerLng">--</span></div>
+        <div>Alt: <span id="playerAlt">--</span></div>
+        
+        <div style="margin-top: 10px;"><strong>Detection:</strong></div>
         <div>Distance: <span id="ghostDistance">--</span></div>
         <div>Floor Match: <span id="floorMatch">--</span></div>
         <div>In Zone: <span id="inZone">NO</span></div>
+        
+        <div style="margin-top: 10px;"><strong>GPS Accuracy:</strong></div>
+        <div>±<span id="gpsAccuracy">--</span>m</div>
     </div>
 
     <script>
@@ -616,13 +630,23 @@
                 ghostLocation.lat, ghostLocation.lng
             );
             
-            const verticalDistance = Math.abs(currentPosition.altitude - ghostLocation.alt);
+            const verticalDistance = Math.abs((currentPosition.altitude || 0) - ghostLocation.alt);
             
             // Must be within 3 meters horizontally AND 1 meter vertically (same floor)
             const inHorizontalZone = horizontalDistance <= 3;
             const onSameFloor = verticalDistance <= 1;
             
-            // Update debug display
+            // Update detailed debug display
+            document.getElementById('ghostLat').textContent = ghostLocation.lat.toFixed(8);
+            document.getElementById('ghostLng').textContent = ghostLocation.lng.toFixed(8);
+            document.getElementById('ghostAlt').textContent = ghostLocation.alt.toFixed(1) + 'm';
+            document.getElementById('ghostFloor').textContent = ghostLocation.floor;
+            
+            document.getElementById('playerLat').textContent = currentPosition.latitude.toFixed(8);
+            document.getElementById('playerLng').textContent = currentPosition.longitude.toFixed(8);
+            document.getElementById('playerAlt').textContent = (currentPosition.altitude || 0).toFixed(1) + 'm';
+            document.getElementById('gpsAccuracy').textContent = (currentPosition.accuracy || 0).toFixed(1);
+            
             document.getElementById('ghostDistance').textContent = horizontalDistance.toFixed(1) + 'm';
             document.getElementById('floorMatch').textContent = onSameFloor ? 'YES' : 'NO';
             document.getElementById('inZone').textContent = (inHorizontalZone && onSameFloor) ? 'YES' : 'NO';
@@ -635,9 +659,17 @@
             const input = document.getElementById('gameCodeInput');
             const code = input.value;
             
+            console.log('Starting investigation with code:', code);
+            
             if (code.length !== 4) {
                 alert('Please enter a 4-digit code');
                 return;
+            }
+            
+            // Clear any existing investigation data first
+            if (positionWatcher) {
+                navigator.geolocation.clearWatch(positionWatcher);
+                positionWatcher = null;
             }
             
             // Request location permission
@@ -646,8 +678,12 @@
                 return;
             }
             
+            console.log('Requesting location permission...');
+            
             navigator.geolocation.getCurrentPosition(
                 function(position) {
+                    console.log('Location permission granted:', position.coords);
+                    
                     // Store starting position
                     playerStartPos = {
                         lat: position.coords.latitude,
@@ -662,9 +698,9 @@
                         playerStartPos.alt
                     );
                     
-                    // Update debug display
-                    document.getElementById('ghostLocation').textContent = 
-                        `${ghostLocation.distance.toFixed(1)}m ${ghostLocation.floor}`;
+                    console.log('Ghost generated at:', ghostLocation);
+                    console.log('Player started at:', playerStartPos);
+                    console.log('GPS accuracy:', position.coords.accuracy, 'meters');
                     
                     // Start investigation
                     gameCode = code;
@@ -677,15 +713,37 @@
                     startTimer();
                     startLocationTracking();
                     
-                    console.log('Investigation started:', {
-                        code: code,
-                        startPos: playerStartPos,
-                        ghostPos: ghostLocation
-                    });
+                    // Set initial position for debug
+                    currentPosition = position.coords;
+                    isInGhostZone(); // Update debug display
+                    
+                    console.log('Investigation started successfully');
                 },
                 function(error) {
-                    alert('Location access denied. Please enable location services and try again.');
                     console.error('Geolocation error:', error);
+                    let errorMsg = 'Location access denied. ';
+                    
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg += 'Please enable location services and try again.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg += 'Location information unavailable.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg += 'Location request timed out.';
+                            break;
+                        default:
+                            errorMsg += 'Unknown location error.';
+                            break;
+                    }
+                    
+                    alert(errorMsg);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 10000
                 }
             );
         }
@@ -694,20 +752,38 @@
         function startLocationTracking() {
             if (!navigator.geolocation) return;
             
+            console.log('Starting location tracking...');
+            
             positionWatcher = navigator.geolocation.watchPosition(
                 function(position) {
                     currentPosition = position.coords;
                     
+                    console.log('Location update:', {
+                        lat: position.coords.latitude.toFixed(8),
+                        lng: position.coords.longitude.toFixed(8),
+                        accuracy: position.coords.accuracy + 'm',
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+                    
                     // Check if in ghost zone (this will affect EMF readings)
-                    isInGhostZone();
+                    const inZone = isInGhostZone();
+                    
+                    if (inZone) {
+                        console.log('🎯 PLAYER IN GHOST ZONE! EMF should spike to 5.0');
+                    }
                 },
                 function(error) {
                     console.error('Location tracking error:', error);
+                    
+                    // Update debug with error
+                    document.getElementById('playerLat').textContent = 'ERROR';
+                    document.getElementById('playerLng').textContent = 'ERROR';
+                    document.getElementById('gpsAccuracy').textContent = 'ERROR';
                 },
                 {
                     enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 1000
+                    timeout: 5000,
+                    maximumAge: 500  // More frequent updates for testing
                 }
             );
         }
@@ -755,11 +831,14 @@
         
         function endInvestigation() {
             if (confirm('Are you sure you want to end the current investigation?')) {
+                console.log('Ending investigation - clearing all data');
+                
                 // Stop all systems
                 investigationActive = false;
                 devicePowered = false;
                 gameCode = '';
                 
+                // Clear timers and intervals
                 if (timerInterval) {
                     clearInterval(timerInterval);
                     timerInterval = null;
@@ -777,6 +856,11 @@
                 
                 stopEMFReadings();
                 
+                // Reset location/ghost data
+                playerStartPos = null;
+                ghostLocation = null;
+                currentPosition = null;
+                
                 // Reset UI
                 document.getElementById('gameCodeInput').value = '';
                 showScreen('homeScreen');
@@ -792,7 +876,13 @@
                     led.style.opacity = '0.3';
                 });
                 
-                console.log('Investigation ended');
+                // Clear debug display
+                ['ghostLat', 'ghostLng', 'ghostAlt', 'ghostFloor', 'playerLat', 'playerLng', 'playerAlt', 'gpsAccuracy', 'ghostDistance', 'floorMatch', 'inZone'].forEach(id => {
+                    document.getElementById(id).textContent = '--';
+                });
+                document.getElementById('inZone').textContent = 'NO';
+                
+                console.log('Investigation ended - all data cleared');
             }
         }
         
