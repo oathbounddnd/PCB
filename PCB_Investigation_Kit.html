@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PCB Investigation Kit</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: 
+                radial-gradient(circle at 30% 20%, rgba(64, 64, 64, 0.3), transparent 50%),
+                radial-gradient(circle at 70% 80%, rgba(96, 96, 96, 0.2), transparent 50%),
+                linear-gradient(135deg, #2a2a2a, #1a1a1a);
+            font-family: 'Times New Roman', serif;
+            color: #c0c0c0;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Static overlay for all screens */
+        .static-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(128, 128, 128, 0.06) 1px, transparent 1px),
+                radial-gradient(circle at 80% 70%, rgba(160, 160, 160, 0.04) 1px, transparent 1px);
+            background-size: 6px 6px, 8px 8px;
+            animation: staticNoise 0.2s infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        @keyframes staticNoise {
+            0% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.5; }
+        }
+
+        /* Screen management */
+        .screen {
+            position: relative;
+            z-index: 2;
+            height: 100vh;
+            padding: 20px;
+            display: none;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Home Screen */
+        .home-screen {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .pcb-logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #a0a0a0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7), 0 0 15px #888888;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+
+        .home-subtitle {
+            font-size: 16px;
+            color: #888;
+            margin-bottom: 40px;
+            font-style: italic;
+        }
+
+        .game-code-input {
+            width: 200px;
+            height: 60px;
+            font-size: 28px;
+            text-align: center;
+            background: #1a1a1a;
+            border: 3px solid #666;
+            border-radius: 8px;
+            color: #c0c0c0;
+            font-family: 'Times New Roman', serif;
+            letter-spacing: 8px;
+            margin-bottom: 30px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+        }
+
+        .game-code-input:focus {
+            outline: none;
+            border-color: #a0a0a0;
+            box-shadow: 
+                inset 0 0 15px rgba(0,0,0,0.8),
+                0 0 15px rgba(160,160,160,0.3);
+        }
+
+        .btn {
+            padding: 15px 30px;
+            background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+            border: 2px solid #888;
+            color: #c0c0c0;
+            font-family: 'Times New Roman', serif;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 10px;
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+            background: linear-gradient(145deg, #2a2a2a, #4a4a4a);
+        }
+
+        /* Tool Selection Screen */
+        .tool-screen {
+            justify-content: flex-start;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #a0a0a0;
+            margin-bottom: 10px;
+        }
+
+        .timer-display {
+            font-size: 32px;
+            color: #90EE90;
+            text-shadow: 0 0 10px #90EE90;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .case-info {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .tool-btn {
+            padding: 30px 20px;
+            background: linear-gradient(145deg, #383838, #2a2a2a);
+            border: 2px solid #666;
+            color: #c0c0c0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .tool-btn:hover {
+            border-color: #888;
+            background: linear-gradient(145deg, #4a4a4a, #3a3a3a);
+        }
+
+        .tool-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+        }
+
+        .tool-icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .tool-name {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        /* EMF Tool */
+        .emf-container {
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .emf-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 3px double #888888;
+            padding-bottom: 15px;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 8px 15px;
+            background: linear-gradient(145deg, #3a3a3a, #2a2a2a);
+            border: 1px solid #666;
+            color: #888;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(42, 42, 42, 0.9), rgba(26, 26, 26, 0.9));
+            border: 2px solid #606060;
+            padding: 12px 18px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.4);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+            color: #a0a0a0;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+        }
+
+        .power-button {
+            cursor: pointer;
+            padding: 6px 12px;
+            border: 2px solid #888888;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            user-select: none;
+            background: linear-gradient(145deg, #3a3a3a, #2a2a2a);
+            margin-left: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(136, 136, 136, 0.2);
+        }
+
+        .power-button:hover {
+            background: linear-gradient(145deg, #4a4a4a, #3a3a3a);
+            border-color: #a0a0a0;
+            color: #c0c0c0;
+        }
+
+        .power-button.powered-on {
+            color: #90EE90;
+            border-color: #90EE90;
+            text-shadow: 0 0 8px #90EE90;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(144, 238, 144, 0.3), 0 0 10px rgba(144, 238, 144, 0.3);
+        }
+
+        .status-led {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 1px solid rgba(0,0,0,0.4);
+        }
+
+        .status-led.green {
+            background: radial-gradient(circle, #32cd32, #228b22);
+            box-shadow: 0 0 8px rgba(50, 205, 50, 0.8), inset 0 0 4px rgba(255,255,255,0.3);
+        }
+
+        .status-led.red {
+            background: radial-gradient(circle, #dc143c, #8b0000);
+            box-shadow: 0 0 8px rgba(220, 20, 60, 0.8), inset 0 0 4px rgba(255,255,255,0.3);
+        }
+
+        .main-display {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .emf-meter {
+            width: 280px;
+            height: 280px;
+            border: 4px solid #888888;
+            border-radius: 50%;
+            position: relative;
+            background: radial-gradient(circle at 30% 30%, #383838, #2a2a2a), radial-gradient(circle at 70% 70%, #404040, #2a2a2a);
+            box-shadow: 0 0 25px rgba(136, 136, 136, 0.6), inset 0 0 30px rgba(64, 64, 64, 0.4), inset 0 0 60px rgba(0,0,0,0.8);
+            margin-bottom: 30px;
+        }
+
+        .meter-face {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            border: 2px solid #606060;
+            background: radial-gradient(circle at 40% 40%, #2f2f2f, #1a1a1a), radial-gradient(circle at 60% 60%, #383838, #1a1a1a);
+        }
+
+        .dial-numbers {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 280px;
+            height: 280px;
+            transform: translate(-50%, -50%);
+        }
+
+        .dial-number {
+            position: absolute;
+            font-size: 20px;
+            font-weight: bold;
+            color: #b8b8b8;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            font-family: 'Times New Roman', serif;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .scale-marks {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 220px;
+            height: 220px;
+            transform: translate(-50%, -50%);
+        }
+
+        .scale-mark {
+            position: absolute;
+            width: 2px;
+            height: 12px;
+            background: linear-gradient(180deg, #b8b8b8, #888888);
+            top: 8px;
+            left: 50%;
+            transform-origin: 50% 102px;
+            box-shadow: 0 0 2px rgba(184, 184, 184, 0.4);
+        }
+
+        .scale-mark.major {
+            width: 3px;
+            height: 18px;
+            background: linear-gradient(180deg, #d0d0d0, #a0a0a0);
+            top: 2px;
+            box-shadow: 0 0 4px rgba(208, 208, 208, 0.6);
+        }
+
+        .needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 3px;
+            height: 100px;
+            background: linear-gradient(180deg, #c0c0c0, #707070);
+            transform-origin: bottom center;
+            transform: translate(-50%, -100%) rotate(-90deg);
+            transition: transform 0.4s ease;
+            box-shadow: 0 0 8px rgba(192, 192, 192, 0.8), 2px 0 4px rgba(0,0,0,0.6);
+            border-radius: 2px;
+        }
+
+        .needle-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            background: radial-gradient(circle, #d0d0d0, #a0a0a0);
+            border: 2px solid #606060;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(208, 208, 208, 0.6), inset 0 0 5px rgba(0,0,0,0.4);
+        }
+
+        .digital-reading {
+            text-align: center;
+            margin-bottom: 20px;
+            background: rgba(42, 42, 42, 0.6);
+            border: 2px solid #606060;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+        }
+
+        .emf-value {
+            font-size: 48px;
+            color: #d0d0d0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(208, 208, 208, 0.6);
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-family: 'Times New Roman', serif;
+        }
+
+        .emf-unit {
+            font-size: 16px;
+            color: #a0a0a0;
+            font-style: italic;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+        }
+
+        .ghost-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(42, 42, 42, 0.9);
+            border: 1px solid #666;
+            border-radius: 5px;
+            padding: 10px;
+            font-size: 12px;
+            color: #888;
+            max-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="static-overlay"></div>
+    
+    <!-- Home Screen -->
+    <div id="homeScreen" class="screen home-screen active">
+        <div class="pcb-logo">PARANORMAL CONTAINMENT BUREAU</div>
+        <div class="home-subtitle">Investigation Kit v2.1</div>
+        
+        <input type="text" class="game-code-input" id="gameCodeInput" maxlength="4" placeholder="----">
+        <div style="margin-bottom: 20px; color: #888; font-size: 14px;">Enter 4-Digit Case File Code</div>
+        
+        <button class="btn" onclick="startInvestigation()">Start Investigation</button>
+        
+        <div style="margin-top: 40px; font-size: 12px; color: #666;">
+            Position yourself in the center of the investigation area before starting
+        </div>
+    </div>
+    
+    <!-- Tool Selection Screen -->
+    <div id="toolScreen" class="screen tool-screen">
+        <div class="header">
+            <h1>PCB Investigation Kit</h1>
+            <div class="timer-display" id="timerDisplay">00:00:00</div>
+            <div class="case-info">Case File: <span id="caseCode">----</span> | Status: <span id="investigationStatus">ACTIVE</span></div>
+        </div>
+        
+        <div class="tools-grid">
+            <div class="tool-btn" onclick="openTool('emf')">
+                <div class="tool-icon">📊</div>
+                <div class="tool-name">EMF READER</div>
+            </div>
+            
+            <div class="tool-btn disabled">
+                <div class="tool-icon">📻</div>
+                <div class="tool-name">SPIRIT BOX</div>
+                <div style="font-size: 10px; margin-top: 5px;">COMING SOON</div>
+            </div>
+            
+            <div class="tool-btn disabled">
+                <div class="tool-icon">🎤</div>
+                <div class="tool-name">EVP RECORDER</div>
+                <div style="font-size: 10px; margin-top: 5px;">COMING SOON</div>
+            </div>
+            
+            <div class="tool-btn disabled">
+                <div class="tool-icon">📷</div>
+                <div class="tool-name">CAMERA</div>
+                <div style="font-size: 10px; margin-top: 5px;">COMING SOON</div>
+            </div>
+        </div>
+        
+        <button class="btn" onclick="endInvestigation()" style="margin-top: 40px; background: linear-gradient(145deg, #4a2a2a, #2a1a1a); border-color: #664444;">
+            End Investigation
+        </button>
+    </div>
+    
+    <!-- EMF Tool Screen -->
+    <div id="emfScreen" class="screen">
+        <div class="emf-container">
+            <button class="back-btn" onclick="backToTools()">← TOOLS</button>
+            
+            <div class="emf-header">
+                <div style="font-size: 22px; font-weight: bold; color: #a0a0a0; margin-bottom: 8px;">ELECTROMAGNETIC FIELD DETECTOR</div>
+                <div style="font-size: 11px; color: #707070; font-style: italic;">Patent No. 1887-EMF-UK | Est. Her Majesty's Service</div>
+            </div>
+
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-led red" id="powerLed" style="opacity: 0.3;"></div>
+                    <span class="power-button" id="powerBtn">POWER</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-led red" id="calibLed" style="opacity: 0.3;"></div>
+                    <span>CALIBRATED</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-led red" id="anomalyLed" style="opacity: 0.3;"></div>
+                    <span>ANOMALY</span>
+                </div>
+            </div>
+
+            <div class="main-display">
+                <div class="emf-meter">
+                    <div class="meter-face">
+                        <div class="dial-numbers"></div>
+                        <div class="scale-marks"></div>
+                        <div class="needle"></div>
+                        <div class="needle-center"></div>
+                    </div>
+                </div>
+
+                <div class="digital-reading">
+                    <div class="emf-value">0.00</div>
+                    <div class="emf-unit">Milligauss (Electromagnetic Flux)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug Status (remove in production) -->
+    <div class="ghost-status" id="ghostStatus">
+        <div><strong>Debug Info:</strong></div>
+        <div>Ghost: <span id="ghostLocation">Not generated</span></div>
+        <div>Distance: <span id="ghostDistance">--</span></div>
+        <div>Floor Match: <span id="floorMatch">--</span></div>
+        <div>In Zone: <span id="inZone">NO</span></div>
+    </div>
+
+    <script>
+        // Global game state
+        let gameCode = '';
+        let investigationActive = false;
+        let startTime = null;
+        let timerInterval = null;
+        let currentScreen = 'homeScreen';
+        
+        // EMF state
+        let devicePowered = false;
+        let calibrationTimeout = null;
+        let emfAnimationInterval = null;
+        let currentEMF = 0.0;
+        
+        // Ghost/GPS state
+        let playerStartPos = null;
+        let ghostLocation = null;
+        let positionWatcher = null;
+        let currentPosition = null;
+        
+        // Ghost location generation (2-4 meters from start, optionally +3m up)
+        function generateGhostLocation(startLat, startLng, startAlt) {
+            // Random distance between 2-4 meters
+            const distance = 2 + Math.random() * 2;
+            
+            // Random direction (0-360 degrees)
+            const angle = Math.random() * 2 * Math.PI;
+            
+            // Convert distance to lat/lng offset (roughly)
+            const latOffset = (distance * Math.cos(angle)) / 111320; // meters to degrees lat
+            const lngOffset = (distance * Math.sin(angle)) / (111320 * Math.cos(startLat * Math.PI / 180)); // meters to degrees lng
+            
+            // Optional upstairs (+3 meters)
+            const isUpstairs = Math.random() < 0.4; // 40% chance upstairs
+            const altOffset = isUpstairs ? 3 : 0;
+            
+            return {
+                lat: startLat + latOffset,
+                lng: startLng + lngOffset,
+                alt: startAlt + altOffset,
+                floor: isUpstairs ? 'upstairs' : 'ground floor',
+                distance: distance
+            };
+        }
+        
+        // Calculate distance between two GPS points
+        function calculateDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371000; // Earth's radius in meters
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Distance in meters
+        }
+        
+        // Check if player is in ghost detection zone
+        function isInGhostZone() {
+            if (!currentPosition || !ghostLocation) return false;
+            
+            const horizontalDistance = calculateDistance(
+                currentPosition.latitude, currentPosition.longitude,
+                ghostLocation.lat, ghostLocation.lng
+            );
+            
+            const verticalDistance = Math.abs(currentPosition.altitude - ghostLocation.alt);
+            
+            // Must be within 3 meters horizontally AND 1 meter vertically (same floor)
+            const inHorizontalZone = horizontalDistance <= 3;
+            const onSameFloor = verticalDistance <= 1;
+            
+            // Update debug display
+            document.getElementById('ghostDistance').textContent = horizontalDistance.toFixed(1) + 'm';
+            document.getElementById('floorMatch').textContent = onSameFloor ? 'YES' : 'NO';
+            document.getElementById('inZone').textContent = (inHorizontalZone && onSameFloor) ? 'YES' : 'NO';
+            
+            return inHorizontalZone && onSameFloor;
+        }
+        
+        // Start investigation
+        function startInvestigation() {
+            const input = document.getElementById('gameCodeInput');
+            const code = input.value;
+            
+            if (code.length !== 4) {
+                alert('Please enter a 4-digit code');
+                return;
+            }
+            
+            // Request location permission
+            if (!navigator.geolocation) {
+                alert('Geolocation not supported by this browser');
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    // Store starting position
+                    playerStartPos = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        alt: position.coords.altitude || 0
+                    };
+                    
+                    // Generate ghost location
+                    ghostLocation = generateGhostLocation(
+                        playerStartPos.lat,
+                        playerStartPos.lng,
+                        playerStartPos.alt
+                    );
+                    
+                    // Update debug display
+                    document.getElementById('ghostLocation').textContent = 
+                        `${ghostLocation.distance.toFixed(1)}m ${ghostLocation.floor}`;
+                    
+                    // Start investigation
+                    gameCode = code;
+                    investigationActive = true;
+                    startTime = Date.now();
+                    
+                    // Update UI
+                    document.getElementById('caseCode').textContent = code;
+                    showScreen('toolScreen');
+                    startTimer();
+                    startLocationTracking();
+                    
+                    console.log('Investigation started:', {
+                        code: code,
+                        startPos: playerStartPos,
+                        ghostPos: ghostLocation
+                    });
+                },
+                function(error) {
+                    alert('Location access denied. Please enable location services and try again.');
+                    console.error('Geolocation error:', error);
+                }
+            );
+        }
+        
+        // Start location tracking
+        function startLocationTracking() {
+            if (!navigator.geolocation) return;
+            
+            positionWatcher = navigator.geolocation.watchPosition(
+                function(position) {
+                    currentPosition = position.coords;
+                    
+                    // Check if in ghost zone (this will affect EMF readings)
+                    isInGhostZone();
+                },
+                function(error) {
+                    console.error('Location tracking error:', error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 1000
+                }
+            );
+        }
+        
+        // Timer functions
+        function startTimer() {
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+        
+        function updateTimer() {
+            if (!investigationActive || !startTime) return;
+            
+            const elapsed = Date.now() - startTime;
+            const seconds = Math.floor(elapsed / 1000);
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            document.getElementById('timerDisplay').textContent = timeString;
+        }
+        
+        // Screen management
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+            currentScreen = screenId;
+        }
+        
+        function openTool(toolName) {
+            if (toolName === 'emf') {
+                showScreen('emfScreen');
+            }
+        }
+        
+        function backToTools() {
+            // Stop EMF if running
+            if (devicePowered) {
+                togglePower();
+            }
+            showScreen('toolScreen');
+        }
+        
+        function endInvestigation() {
+            if (confirm('Are you sure you want to end the current investigation?')) {
+                // Stop all systems
+                investigationActive = false;
+                devicePowered = false;
+                gameCode = '';
+                
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                
+                if (positionWatcher) {
+                    navigator.geolocation.clearWatch(positionWatcher);
+                    positionWatcher = null;
+                }
+                
+                if (calibrationTimeout) {
+                    clearTimeout(calibrationTimeout);
+                    calibrationTimeout = null;
+                }
+                
+                stopEMFReadings();
+                
+                // Reset UI
+                document.getElementById('gameCodeInput').value = '';
+                showScreen('homeScreen');
+                
+                // Reset EMF display
+                document.querySelector('.emf-value').textContent = '0.00';
+                document.getElementById('powerBtn').classList.remove('powered-on');
+                
+                // Reset all LEDs
+                ['powerLed', 'calibLed', 'anomalyLed'].forEach(id => {
+                    const led = document.getElementById(id);
+                    led.className = 'status-led red';
+                    led.style.opacity = '0.3';
+                });
+                
+                console.log('Investigation ended');
+            }
+        }
+        
+        // EMF Functions
+        function createDialNumbers() {
+            const dialNumbers = document.querySelector('.dial-numbers');
+            for (let i = 0; i <= 10; i++) {
+                const number = document.createElement('div');
+                number.className = 'dial-number';
+                number.textContent = i;
+                
+                const angle = 180 + (i * 18);
+                const radius = 130;
+                const radian = (angle * Math.PI) / 180;
+                const x = Math.cos(radian) * radius;
+                const y = Math.sin(radian) * radius;
+                
+                number.style.left = `calc(50% + ${x}px - 12px)`;
+                number.style.top = `calc(50% + ${y}px - 12px)`;
+                
+                dialNumbers.appendChild(number);
+            }
+        }
+        
+        function createScaleMarks() {
+            const scaleMarks = document.querySelector('.scale-marks');
+            
+            for (let i = 0; i <= 10; i++) {
+                const mark = document.createElement('div');
+                mark.className = 'scale-mark major';
+                const mathAngle = 180 + (i * 18);
+                const cssAngle = mathAngle - 270;
+                mark.style.transform = `rotate(${cssAngle}deg)`;
+                scaleMarks.appendChild(mark);
+            }
+            
+            for (let i = 0; i < 10; i++) {
+                const mark = document.createElement('div');
+                mark.className = 'scale-mark';
+                const mathAngle = 180 + (i * 18) + 9;
+                const cssAngle = mathAngle - 270;
+                mark.style.transform = `rotate(${cssAngle}deg)`;
+                scaleMarks.appendChild(mark);
+            }
+        }
+        
+        function updateEMFDisplay(emfValue) {
+            document.querySelector('.emf-value').textContent = emfValue.toFixed(2);
+            
+            const needleAngle = -90 + (emfValue * 18);
+            const needle = document.querySelector('.needle');
+            if (needle) {
+                needle.style.transform = `translate(-50%, -100%) rotate(${needleAngle}deg)`;
+            }
+        }
+        
+        function generateEMFReading() {
+            if (!devicePowered) return;
+            
+            let targetEMF;
+            
+            // Check if in ghost zone for testing
+            if (isInGhostZone()) {
+                // TEST: EMF 5 when in ghost zone
+                targetEMF = 4.8 + Math.random() * 0.4; // 4.8-5.2 range
+                
+                // Trigger anomaly LED
+                const anomalyLed = document.getElementById('anomalyLed');
+                anomalyLed.className = 'status-led red';
+                anomalyLed.style.opacity = '1';
+            } else {
+                // Normal background EMF (0.1-1.0)
+                const baseLevel = 0.5;
+                const variation = (Math.random() - 0.5) * 0.8;
+                targetEMF = Math.max(0.1, Math.min(1.0, baseLevel + variation));
+                
+                // Turn off anomaly LED
+                const anomalyLed = document.getElementById('anomalyLed');
+                anomalyLed.className = 'status-led red';
+                anomalyLed.style.opacity = '0.3';
+            }
+            
+            // Smooth transition
+            const step = (targetEMF - currentEMF) * 0.1;
+            currentEMF += step;
+            currentEMF = Math.max(0.0, Math.min(10.0, currentEMF));
+            
+            updateEMFDisplay(currentEMF);
+        }
+        
+        function startEMFReadings() {
+            if (emfAnimationInterval) {
+                clearInterval(emfAnimationInterval);
+            }
+            
+            emfAnimationInterval = setInterval(generateEMFReading, 200);
+            console.log('EMF readings started');
+        }
+        
+        function stopEMFReadings() {
+            if (emfAnimationInterval) {
+                clearInterval(emfAnimationInterval);
+                emfAnimationInterval = null;
+            }
+            
+            currentEMF = 0.0;
+            updateEMFDisplay(currentEMF);
+            
+            // Turn off anomaly LED
+            const anomalyLed = document.getElementById('anomalyLed');
+            anomalyLed.className = 'status-led red';
+            anomalyLed.style.opacity = '0.3';
+            
+            console.log('EMF readings stopped');
+        }
+        
+        function togglePower() {
+            if (!investigationActive) {
+                alert('Please start an investigation first');
+                return;
+            }
+            
+            const powerBtn = document.getElementById('powerBtn');
+            const powerLed = document.getElementById('powerLed');
+            const calibLed = document.getElementById('calibLed');
+            
+            if (calibrationTimeout) {
+                clearTimeout(calibrationTimeout);
+                calibrationTimeout = null;
+            }
+            
+            devicePowered = !devicePowered;
+            
+            if (devicePowered) {
+                // Power ON
+                powerBtn.classList.add('powered-on');
+                powerLed.className = 'status-led green';
+                powerLed.style.opacity = '1';
+                
+                calibrationTimeout = setTimeout(() => {
+                    if (devicePowered) {
+                        calibLed.className = 'status-led green';
+                        calibLed.style.opacity = '1';
+                    }
+                    calibrationTimeout = null;
+                }, 500);
+                
+                startEMFReadings();
+                console.log('EMF Device powered ON');
+                
+            } else {
+                // Power OFF
+                powerBtn.classList.remove('powered-on');
+                powerLed.className = 'status-led red';
+                powerLed.style.opacity = '0.3';
+                calibLed.className = 'status-led red';
+                calibLed.style.opacity = '0.3';
+                
+                stopEMFReadings();
+                console.log('EMF Device powered OFF');
+            }
+        }
+        
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('PCB Investigation Kit initialized');
+            
+            createDialNumbers();
+            createScaleMarks();
+            
+            // Power button event listener
+            document.getElementById('powerBtn').addEventListener('click', togglePower);
+            
+            // Game code input - Enter key support
+            document.getElementById('gameCodeInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    startInvestigation();
+                }
+                // Only allow numbers
+                if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Enter') {
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
