@@ -166,6 +166,30 @@
       margin-bottom: 20px;
       text-shadow: 0 0 5px #90EE90;
     }
+    
+    /* Persistent Timer Overlay */
+    .timer-overlay {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      background: rgba(42,42,42,0.9);
+      border: 2px solid #90EE90;
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 18px;
+      font-weight: bold;
+      color: #90EE90;
+      text-shadow: 0 0 10px #90EE90;
+      box-shadow: 0 0 20px rgba(144,238,144,0.3);
+      min-width: 120px;
+      text-align: center;
+      display: none;
+    }
+    .timer-overlay.active {
+      display: block;
+    }
     .tools-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; max-width:400px; }
     .tool-btn {
       padding:30px 20px; background:linear-gradient(145deg, #383838, #2a2a2a);
@@ -386,6 +410,11 @@
 </head>
 <body>
   <div class="static-overlay"></div>
+
+  <!-- Persistent Timer Overlay -->
+  <div id="timerOverlay" class="timer-overlay">
+    <div id="overlayTimer">00:00:00</div>
+  </div>
 
   <!-- 0) INITIAL CALIBRATION -->
   <div id="calibrationScreen" class="screen setup-screen active">
@@ -651,32 +680,20 @@
         }
         const ghostDataText = await response.text();
         
-        console.log('Raw ghost data text loaded successfully');
-        
         // Process the file content to handle the custom syntax
         const processedContent = processGhostDataSyntax(ghostDataText);
-        
-        console.log('Ghost data processed successfully');
         
         // Parse as JSON
         const ghostData = JSON.parse(processedContent);
         
-        console.log('Loaded ghost data from JSON file:', ghostData);
         return ghostData;
       } catch (error) {
-        console.error('Failed to load ghost data:', error.message);
-        
-        if (error.message.includes('NetworkError') || error.message.includes('CORS')) {
-          alert('❌ CORS Error: Please run a local HTTP server!\n\nSolutions:\n1. Use START_SERVER.bat\n2. Or run: python -m http.server 8000');
-        }
-        
+        // Silent failure - no user-visible errors
         return null;
       }
     }
     
     function processGhostDataSyntax(content) {
-      console.log('Processing content:', content);
-      
       // Remove comment lines
       content = content.replace(/\/\/ .+\n/g, '');
       
@@ -684,13 +701,13 @@
       
       // First, handle the timeline section manually
       if (content.includes('"timeline": new Sequence()')) {
-        // Extract the timeline events manually
+        // Extract the timeline events manually (converted to minutes)
         const timelineEvents = [
-          { effect: "emf_spike", time: 3, emf_spike: 5.1, duration: 3, audio: "angry_growl.mp3" },
-          { effect: "emf_spike", time: 7, emf_spike: 5.6, duration: 4, audio: "chair_scrape.mp3" },
-          { effect: "emf_spike", time: 12, emf_spike: 5.9, duration: 5, audio: "door_slam.mp3" },
-          { effect: "emf_spike", time: 18, emf_spike: 5.3, duration: 4, audio: "heavy_breathing.mp3" },
-          { effect: "emf_spike", time: 24, emf_spike: 5.8, duration: 6, audio: "angry_voice.mp3" }
+          { effect: "emf_spike", time: 0.05, emf_spike: 5.1, duration: 3, audio: "angry_growl.mp3" }, // 3 seconds
+          { effect: "emf_spike", time: 0.117, emf_spike: 5.6, duration: 4, audio: "chair_scrape.mp3" }, // 7 seconds  
+          { effect: "emf_spike", time: 0.2, emf_spike: 5.9, duration: 5, audio: "door_slam.mp3" }, // 12 seconds
+          { effect: "emf_spike", time: 0.3, emf_spike: 5.3, duration: 4, audio: "heavy_breathing.mp3" }, // 18 seconds
+          { effect: "emf_spike", time: 0.4, emf_spike: 5.8, duration: 6, audio: "angry_voice.mp3" } // 24 seconds
         ];
         
         // Replace the entire timeline section
@@ -716,7 +733,6 @@
         JSON.stringify({ effect: "emf_spike", emf_spike: 4.1, duration: 3, audio: "male_voice_angry.mp3" })
       );
       
-      console.log('Final processed content:', content);
       return content;
     }
 
@@ -921,23 +937,17 @@
     function startGhostTimeline() {
       if (!currentGhostData || !currentGhostData.timeline) return;
       
-      console.log('Starting ghost timeline system');
-      
       // Timeline is now a processed array of events
       const timelineEvents = currentGhostData.timeline;
       
       if (!timelineEvents || !Array.isArray(timelineEvents)) {
-        console.log('No valid timeline events found');
         return;
       }
-      
-      console.log('Timeline events:', timelineEvents);
       
       // Schedule all timeline events
       timelineEvents.forEach((event, index) => {
         if (event.time !== undefined) {
-          const delay = event.time * 1000; // Convert seconds to milliseconds
-          console.log(`Scheduling event ${index} for ${event.time} seconds:`, event);
+          const delay = event.time * 60 * 1000; // Convert MINUTES to milliseconds
           setTimeout(() => {
             if (investigationActive) {
               executeGhostEvent(event);
@@ -954,18 +964,33 @@
     }
     
     function executeGhostEvent(event) {
-      console.log('Executing ghost event:', event);
+      // Silent execution - no debug messages
+      
+      // TOOL DETECTION PRINCIPLE:
+      // - Ghost events always happen on schedule (timeline continues)
+      // - But events are only DETECTABLE when correct equipment is powered on
+      // - This applies to ALL tools: EMF Reader, Spirit Box, Thermometer, UV Light, etc.
       
       // Check if player is in ghost room (some events only trigger there)
       const ghostRoom = currentGhostData.ghost_info.location;
       const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
       
-      // EMF Spike events
+      // EMF Spike events - only detectable if EMF reader is powered on
       if (event.effect === 'emf_spike' && event.emf_spike) {
-        triggerEMFSpike(event.emf_spike, event.duration || 3);
+        if (devicePowered) {
+          triggerEMFSpike(event.emf_spike, event.duration || 3);
+        }
+        // Event still happened, just not detectable without EMF reader
       }
       
-      // Auto events (these work regardless of syntax)
+      // Spirit Box events - only detectable if Spirit Box is powered on
+      // if (event.effect === 'spirit_response' && event.audio) {
+      //   if (spiritBoxPowered) {
+      //     playGhostAudio(`./Games/Audio/${event.audio}`, event.volume || 'medium');
+      //   }
+      // }
+      
+      // Auto events (these work regardless of equipment - environmental)
       if (event.effect === 'door_slam') {
         triggerDoorSlam();
       } else if (event.effect === 'door_creak') {
@@ -979,21 +1004,25 @@
       // Ghost movement
       if (event.ghost_moves_to) {
         currentGhostRoom = event.ghost_moves_to;
-        console.log(`Ghost moved to: ${currentGhostRoom}`);
       }
       
-      // Audio events (now with real playback from Games/Audio/)
+      // Audio events - tool-specific detection
       if (event.audio) {
         const audioPath = `./Games/Audio/${event.audio}`;
         const volume = event.volume || 'medium';
-        playGhostAudio(audioPath, volume);
+        
+        // Only play EMF-related audio if EMF reader is on
+        if (event.effect === 'emf_spike' && devicePowered) {
+          playGhostAudio(audioPath, volume);
+        } else if (event.effect !== 'emf_spike') {
+          // Non-EMF audio plays regardless (environmental sounds)
+          playGhostAudio(audioPath, volume);
+        }
       }
     }
     
     // ===== AUDIO PLAYBACK SYSTEM =====
     function playGhostAudio(audioPath, volume = 'medium') {
-      console.log(`Playing audio: ${audioPath} at ${volume} volume`);
-      
       try {
         const audio = new Audio(audioPath);
         
@@ -1014,9 +1043,7 @@
         
         // Play the audio
         audio.play().catch(error => {
-          console.log(`Failed to play audio ${audioPath}:`, error);
-          // Fallback: Show visual indicator if audio fails
-          showAudioIndicator(audioPath, volume);
+          // Silent failure - no visual indicators
         });
         
         // Clean up after audio ends
@@ -1025,36 +1052,8 @@
         });
         
       } catch (error) {
-        console.log(`Error loading audio ${audioPath}:`, error);
-        showAudioIndicator(audioPath, volume);
+        // Silent failure - no visual indicators
       }
-    }
-    
-    function showAudioIndicator(audioPath, volume) {
-      // Visual fallback if audio doesn't work
-      const filename = audioPath.split('/').pop();
-      
-      // Create temporary audio indicator
-      const indicator = document.createElement('div');
-      indicator.style.cssText = `
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        background: rgba(42,42,42,0.95); border: 2px solid #666; border-radius: 8px;
-        padding: 15px; text-align: center; z-index: 2000; color: #c0c0c0;
-        font-size: 14px; min-width: 200px;
-      `;
-      indicator.innerHTML = `
-        🔊 Audio: ${filename}<br>
-        <small>Volume: ${volume}</small>
-      `;
-      
-      document.body.appendChild(indicator);
-      
-      // Remove after 2 seconds
-      setTimeout(() => {
-        if (indicator.parentNode) {
-          indicator.parentNode.removeChild(indicator);
-        }
-      }, 2000);
     }
     
     function processGhostEventQueue() {
@@ -1067,9 +1066,7 @@
     
     // ===== GHOST EVENT FUNCTIONS =====
     function triggerEMFSpike(value, duration = 3) {
-      if (!devicePowered) return;
-      
-      console.log(`EMF Spike: ${value} for ${duration} seconds`);
+      if (!devicePowered) return; // Only work if EMF reader is on
       
       // Store original EMF value
       const originalEMF = currentEMF;
@@ -1090,7 +1087,6 @@
     }
     
     function triggerDoorSlam() {
-      console.log('Door slam event');
       // Auto plays sound + EMF 4.2 + shake
       triggerEMFSpike(4.2, 2);
       triggerScreenShake();
@@ -1098,14 +1094,12 @@
     }
     
     function triggerDoorCreak() {
-      console.log('Door creak event');
       // Auto plays sound + EMF 2.8
       triggerEMFSpike(2.8, 3);
       playGhostAudio('./Games/Audio/door_creak.mp3', 'medium');
     }
     
     function triggerLightsFlicker() {
-      console.log('Lights flicker event');
       // Auto flickers for 3 seconds
       const body = document.body;
       let flickerCount = 0;
@@ -1120,7 +1114,6 @@
     }
     
     function triggerScreenShake() {
-      console.log('Screen shake event');
       const body = document.body;
       body.style.animation = 'shake 0.5s ease-in-out';
       setTimeout(() => {
@@ -1135,12 +1128,9 @@
       const trigger = currentGhostData.triggers[triggerName];
       if (!trigger || !Array.isArray(trigger)) return;
       
-      console.log(`Ghost trigger activated: ${triggerName}`);
-      
       // Execute a random response from the trigger array
       const randomResponse = trigger[Math.floor(Math.random() * trigger.length)];
       if (randomResponse) {
-        console.log('Executing trigger response:', randomResponse);
         // Trigger response is now a processed object, not a Sequence
         executeGhostEvent(randomResponse);
       }
@@ -1512,9 +1502,15 @@
         const h = Math.floor(s / 3600);
         const m = Math.floor((s % 3600)/60);
         const sec = s % 60;
-        document.getElementById('timerDisplay').textContent =
-          `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+        const timeString = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+        
+        // Update both timer displays
+        document.getElementById('timerDisplay').textContent = timeString;
+        document.getElementById('overlayTimer').textContent = timeString;
       }, 1000);
+      
+      // Show overlay timer
+      document.getElementById('timerOverlay').classList.add('active');
     }
 
     function openTool(name) {
@@ -1546,11 +1542,16 @@
       if (evidenceTimer) clearTimeout(evidenceTimer);
       if (timelineCheckInterval) clearInterval(timelineCheckInterval);
       if (eventProcessingInterval) clearInterval(eventProcessingInterval);
+      if (timerInterval) clearInterval(timerInterval);
       
       // Stop old ghost activity system
       stopGhostActivity();
       
       stopEMFReadings();
+      
+      // Hide overlay timer
+      document.getElementById('timerOverlay').classList.remove('active');
+      
       showScreen('homeScreen');
       updateDebug();
     }
