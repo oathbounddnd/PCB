@@ -190,6 +190,114 @@
     .timer-overlay.active {
       display: block;
     }
+
+    /* Spirit Cam Styles */
+    .spiritcam-container {
+      padding: 20px 20px 100px 20px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .camera-viewport {
+      flex: 1;
+      position: relative;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 20px 0;
+      min-height: 400px;
+    }
+    .camera-feed {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 12px;
+    }
+    .camera-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      border-radius: 12px;
+    }
+    .overlay-spirit {
+      background: radial-gradient(ellipse at center, 
+        rgba(75, 0, 130, 0.1) 0%, 
+        rgba(75, 0, 130, 0.3) 70%, 
+        rgba(75, 0, 130, 0.6) 100%);
+    }
+    .overlay-nightvision {
+      background: radial-gradient(ellipse at center,
+        rgba(0, 255, 0, 0.1) 0%,
+        rgba(0, 100, 0, 0.3) 70%,
+        rgba(0, 50, 0, 0.8) 100%);
+      filter: contrast(1.5) brightness(1.2);
+    }
+    .overlay-uv {
+      background: linear-gradient(45deg, 
+        rgba(138, 43, 226, 0.4), 
+        rgba(75, 0, 130, 0.4));
+      filter: hue-rotate(240deg) saturate(2);
+    }
+    .cam-controls {
+      display: flex;
+      justify-content: space-around;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .cam-btn {
+      padding: 10px 15px;
+      background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+      border: 2px solid #666;
+      color: #c0c0c0;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.3s;
+      flex: 1;
+      max-width: 80px;
+    }
+    .cam-btn.active {
+      border-color: #90EE90;
+      background: linear-gradient(145deg, #4a5a4a, #3a4a3a);
+      color: #90EE90;
+      box-shadow: 0 0 10px rgba(144,238,144,0.3);
+    }
+    .cam-status {
+      text-align: center;
+      margin-bottom: 15px;
+      font-size: 14px;
+      color: #888;
+    }
+    
+    /* Ghost Orbs */
+    .ghost-orb {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, 
+        rgba(255, 255, 255, 0.9), 
+        rgba(144, 238, 144, 0.6), 
+        rgba(144, 238, 144, 0.1));
+      filter: blur(1px);
+      pointer-events: none;
+      animation: float 10s infinite linear;
+      box-shadow: 0 0 20px rgba(144, 238, 144, 0.5);
+    }
+    .ghost-orb.spirit-mode {
+      filter: blur(0.5px) brightness(1.5);
+      box-shadow: 0 0 30px rgba(144, 238, 144, 0.8);
+    }
+    @keyframes float {
+      from {
+        transform: translate(0, 100vh) scale(1);
+      }
+      to {
+        transform: translate(var(--random-x), -100px) scale(1.2);
+      }
+    }
     .tools-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; max-width:400px; }
     .tool-btn {
       padding:30px 20px; background:linear-gradient(145deg, #383838, #2a2a2a);
@@ -490,9 +598,9 @@
         <div class="tool-icon">🎤</div>
         <div class="tool-name">EVP RECORDER</div>
       </div>
-      <div class="tool-btn disabled">
-        <div class="tool-icon">📷</div>
-        <div class="tool-name">CAMERA</div>
+      <div class="tool-btn" onclick="openTool('spiritcam')">
+        <div class="tool-icon">📱</div>
+        <div class="tool-name">SPIRIT CAM</div>
       </div>
     </div>
     <button class="btn" onclick="endInvestigation()" style="margin-top: 40px; background: linear-gradient(145deg, #4a2a2a, #2a1a1a); border-color: #664444;">
@@ -539,6 +647,39 @@
     
     <!-- Room Navigation -->
     <div class="room-nav" id="roomNavigation">
+      <!-- Navigation buttons will be populated by JavaScript -->
+    </div>
+  </div>
+
+  <!-- SPIRIT CAM SCREEN -->
+  <div id="spiritcamScreen" class="screen">
+    <div class="spiritcam-container">
+      <button class="back-btn" onclick="backToTools()">← TOOLS</button>
+      
+      <div class="emf-header" style="text-align:center; margin-bottom:15px;">
+        <div style="font-size:22px; font-weight:bold; color:#a0a0a0;">SPIRIT CAMERA INTERFACE</div>
+        <div style="font-size:11px; color:#707070; font-style:italic;">Paranormal Detection System | Est. Her Majesty's Service</div>
+      </div>
+
+      <div class="cam-status" id="camStatus">
+        Initializing camera feed...
+      </div>
+
+      <div class="camera-viewport">
+        <video id="cameraFeed" class="camera-feed" autoplay muted playsinline></video>
+        <div id="cameraOverlay" class="camera-overlay"></div>
+      </div>
+
+      <div class="cam-controls">
+        <div class="cam-btn active" onclick="setCameraMode('normal')" id="btnNormal">NORMAL</div>
+        <div class="cam-btn" onclick="setCameraMode('nightvision')" id="btnNightVision">NIGHT</div>
+        <div class="cam-btn" onclick="setCameraMode('spirit')" id="btnSpirit">SPIRIT</div>
+        <div class="cam-btn" onclick="setCameraMode('uv')" id="btnUV">UV</div>
+      </div>
+    </div>
+    
+    <!-- Room Navigation -->
+    <div class="room-nav" id="roomNavigationCam">
       <!-- Navigation buttons will be populated by JavaScript -->
     </div>
   </div>
@@ -621,6 +762,20 @@
     // Ghost Activity System
     let ghostEventTimer = null;
     let ghostActivityActive = false;
+
+    // ===== SPIRIT CAM SYSTEM =====
+    let cameraStream = null;
+    let cameraMode = 'normal';
+    let flashlightOn = false;
+    
+    // ===== GHOST ORBS SYSTEM =====
+    let ghostOrbsActive = false;
+    let orbsVisibilityState = false; // true = visible, false = hidden
+    let orbsLoop = null;
+    let currentOrbs = [];
+    let maxOrbs = 5;
+    let orbVisibleDuration = 60000; // 1 minute
+    let orbHiddenDuration = 120000; // 2 minutes
 
     // ===== GHOST DATA SYSTEM (JSON-based) =====
     let currentGhostData = null;
@@ -793,9 +948,10 @@
     function updateDebug() {
       document.getElementById('dbgRoomCount').textContent = availableRooms.length;
       document.getElementById('dbgCurrentRoom').textContent = currentRoom;
-      document.getElementById('dbgGhostRoom').textContent = currentScenario ? currentScenario.room : '--';
+      document.getElementById('dbgGhostRoom').textContent = currentGhostData ? 
+        currentGhostData.ghost_info.location : '--';
       document.getElementById('dbgInZone').textContent = 
-        (currentScenario && currentRoom === currentScenario.room) ? 'YES' : 'NO';
+        (currentGhostData && currentRoom.toLowerCase().replace(/\s+/g, '_') === currentGhostData.ghost_info.location) ? 'YES' : 'NO';
     }
 
     // ===== HOUSE CALIBRATION =====
@@ -880,8 +1036,10 @@
     }
 
     // ===== ROOM NAVIGATION =====
-    function createRoomNavigation() {
-      const nav = document.getElementById('roomNavigation');
+    function createRoomNavigation(containerId = 'roomNavigation') {
+      const nav = document.getElementById(containerId);
+      if (!nav) return;
+      
       nav.innerHTML = '';
       
       availableRooms.forEach(room => {
@@ -915,6 +1073,22 @@
       // Trigger ghost events for room entry
       triggerGhostEvent('player_enters_room');
       
+      // Handle Spirit Cam ghost room detection
+      if (currentScreen === 'spiritcamScreen') {
+        const ghostRoom = currentGhostData?.ghost_info?.location;
+        const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
+        
+        if (playerInGhostRoom) {
+          // Entered ghost room - start orbs if not already active
+          if (!ghostOrbsActive) {
+            startGhostOrbs();
+          }
+        } else {
+          // Left ghost room - stop orbs
+          stopGhostOrbs();
+        }
+      }
+      
       createRoomNavigation();
       updateDebug();
     }
@@ -922,42 +1096,12 @@
     let currentGhostRoom = null; // Track where ghost currently is
     let timelineCheckInterval = null;
     
-    function onPlayerEntersRoom() {
-      // Trigger for JSON ghost responses
-      if (!currentScenario || !currentScenario.TRIGGER_RESPONSES) return;
-      
-      const trigger = currentScenario.TRIGGER_RESPONSES['player_enters_room'];
-      if (trigger && trigger.enabled) {
-        executeRandomTriggerResponse(trigger);
-      }
-    }
-    
-    function executeRandomTriggerResponse(trigger) {
-      if (!trigger.possible_responses || trigger.possible_responses.length === 0) return;
-      
-      // Only execute if player is in ghost room
-      if (currentRoom !== getCurrentGhostRoom()) return;
-      
-      const randomResponse = trigger.possible_responses[Math.floor(Math.random() * trigger.possible_responses.length)];
-      executeEvent(randomResponse);
-    }
-    
     function getCurrentGhostRoom() {
       // Return current ghost location (can change for mobile ghosts)
-      return currentGhostRoom || (currentScenario ? currentScenario.GHOST_INFO.location : null);
+      return currentGhostRoom || (currentGhostData ? currentGhostData.ghost_info.location : null);
     }
     
     function startTimelineSystem() {
-      // Handle old scenario format
-      if (currentScenario && currentScenario.TIMELINE_EVENTS) {
-        // Check timeline events every minute
-        timelineCheckInterval = setInterval(() => {
-          checkTimelineEvents();
-        }, 60000);
-        setTimeout(checkTimelineEvents, 1000);
-        return;
-      }
-      
       // Handle new ghost data format
       if (currentGhostData && currentGhostData.timeline) {
         gameStartTime = Date.now();
@@ -1014,6 +1158,14 @@
           triggerEMFSpike(event.emf_spike, event.duration || 3);
         }
         // Event still happened, just not detectable without EMF reader
+      }
+      
+      // Ghost Orbs events - only detectable if Spirit Cam is active
+      if (event.effect === 'ghost_orbs') {
+        if (currentScreen === 'spiritcamScreen') {
+          triggerGhostOrbs(event);
+        }
+        // Event still happened, just not detectable without Spirit Cam
       }
       
       // Spirit Box events - only detectable if Spirit Box is powered on
@@ -1152,6 +1304,32 @@
       setTimeout(() => {
         body.style.animation = '';
       }, 500);
+    }
+    
+    function triggerGhostOrbs(event) {
+      // Only trigger if Spirit Cam is active and player is in ghost room
+      if (currentScreen !== 'spiritcamScreen') return;
+      
+      const ghostRoom = currentGhostData.ghost_info.location;
+      const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
+      
+      if (!playerInGhostRoom) return;
+      
+      // Parse orb event parameters
+      const visibleDuration = (event.visible_duration || 1) * 60 * 1000; // Convert minutes to ms
+      const hiddenDuration = (event.hidden_duration || 2) * 60 * 1000;   // Convert minutes to ms
+      const maxOrbCount = event.max_orbs || 5;
+      
+      // Update global orb settings
+      orbVisibleDuration = visibleDuration;
+      orbHiddenDuration = hiddenDuration;
+      maxOrbs = maxOrbCount;
+      
+      // Start or restart ghost orbs system
+      if (ghostOrbsActive) {
+        stopGhostOrbs();
+      }
+      startGhostOrbs();
     }
     
     // ===== GHOST TRIGGER SYSTEM =====
@@ -1451,36 +1629,17 @@
       errorElement.style.color = '#90EE90';
       errorElement.textContent = '📡 Loading scenario data...';
 
-      // Load scenario (external JSON or embedded fallback)
-      currentScenario = await loadScenario(code);
-      
-      // ALSO try to load new ghost data format (e.g., 104.json)
+      // Load new ghost data format only (no legacy loading)
       currentGhostData = await loadGhostDataJSON(code);
       
-      // Fallback: if ghost data fails, try to create simple timeline from scenario
-      if (!currentGhostData && currentScenario) {
-        console.log('Creating fallback ghost data from scenario');
-        currentGhostData = {
-          ghost_info: {
-            id: code,
-            location: currentScenario.room || "living_room"
-          },
-          timeline: [
-            { effect: "emf_spike", time: 5, emf_spike: 4.5, duration: 3 },
-            { effect: "emf_spike", time: 15, emf_spike: 5.2, duration: 4 }
-          ],
-          triggers: {}
-        };
-      }
-      
-      if (!currentScenario && !currentGhostData) {
+      if (!currentGhostData) {
         // Show error for unknown codes
         errorElement.style.color = '#ff6666';
         errorElement.textContent = '❌ Error: Wrong Case Code';
         return;
       }
 
-      // Get ghost room from either format
+      // Get ghost room from ghost data
       let ghostRoom;
       if (currentGhostData && currentGhostData.ghost_info) {
         // Convert dining_room -> Dining Room for room matching
@@ -1491,12 +1650,10 @@
         
         // Handle common room name mappings
         if (ghostRoom === 'Dining Room') ghostRoom = 'Dinning Room'; // Match typo in room list
-      } else if (currentScenario) {
-        ghostRoom = currentScenario.GHOST_INFO ? currentScenario.GHOST_INFO.location : currentScenario.room;
       }
       
       // Check if ghost room is available in selected rooms
-      if (!availableRooms.includes(ghostRoom)) {
+      if (!ghostRoom || !availableRooms.includes(ghostRoom)) {
         errorElement.style.color = '#ff6666';
         errorElement.textContent = '❌ Error: Wrong Case Code';
         return;
@@ -1548,6 +1705,254 @@
       if (name === 'emf') {
         showScreen('emfScreen');
         createRoomNavigation();
+      } else if (name === 'spiritcam') {
+        showScreen('spiritcamScreen');
+        createRoomNavigation('roomNavigationCam');
+        initializeCamera();
+      }
+    }
+
+    // ===== SPIRIT CAM FUNCTIONS =====
+    async function initializeCamera() {
+      const statusElement = document.getElementById('camStatus');
+      const videoElement = document.getElementById('cameraFeed');
+      
+      try {
+        statusElement.textContent = 'Requesting camera access...';
+        
+        // Request camera access
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'environment', // Use back camera if available
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+        
+        videoElement.srcObject = cameraStream;
+        statusElement.textContent = 'Camera active - Scanning for paranormal activity...';
+        
+        // Start ghost orbs detection in ghost room
+        const ghostRoom = currentGhostData?.ghost_info?.location;
+        const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
+        
+        if (playerInGhostRoom) {
+          startGhostOrbs();
+        }
+        
+      } catch (error) {
+        statusElement.textContent = 'Camera access denied - Using simulated feed';
+        videoElement.style.background = 'linear-gradient(45deg, #1a1a1a, #2a2a2a)';
+        
+        // Still allow ghost orbs in ghost room even without camera
+        const ghostRoom = currentGhostData?.ghost_info?.location;
+        const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
+        
+        if (playerInGhostRoom) {
+          startGhostOrbs();
+        }
+      }
+    }
+    
+    function setCameraMode(mode) {
+      cameraMode = mode;
+      const overlay = document.getElementById('cameraOverlay');
+      const allBtns = document.querySelectorAll('.cam-btn');
+      
+      // Remove active class from all buttons
+      allBtns.forEach(btn => btn.classList.remove('active'));
+      
+      // Add active class to selected button
+      document.getElementById(`btn${mode.charAt(0).toUpperCase() + mode.slice(1)}`).classList.add('active');
+      
+      // Clear existing overlay classes
+      overlay.className = 'camera-overlay';
+      
+      // Apply mode-specific styling
+      switch(mode) {
+        case 'normal':
+          // No overlay
+          break;
+        case 'nightvision':
+          overlay.classList.add('overlay-nightvision');
+          break;
+        case 'spirit':
+          overlay.classList.add('overlay-spirit');
+          break;
+        case 'uv':
+          overlay.classList.add('overlay-uv');
+          toggleFlashlight(true);
+          break;
+      }
+      
+      // Turn off flashlight for non-UV modes
+      if (mode !== 'uv') {
+        toggleFlashlight(false);
+      }
+      
+      // Update orb visibility based on mode
+      updateOrbsForMode(mode);
+    }
+    
+    function toggleFlashlight(state) {
+      if (!cameraStream) return;
+      
+      const track = cameraStream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
+      
+      if (capabilities.torch) {
+        track.applyConstraints({
+          advanced: [{ torch: state }]
+        }).catch(e => {
+          // Flashlight not available, continue without it
+        });
+      }
+      
+      flashlightOn = state;
+    }
+
+    // ===== GHOST ORBS SYSTEM =====
+    function startGhostOrbs() {
+      if (ghostOrbsActive) return;
+      
+      ghostOrbsActive = true;
+      orbsVisibilityState = true; // Start visible
+      
+      // Create initial orbs
+      createGhostOrbs();
+      
+      // Start visibility loop: visible 1min → hidden 2min → repeat
+      orbsLoop = setTimeout(() => {
+        orbsVisibilityLoop();
+      }, orbVisibleDuration);
+    }
+    
+    function stopGhostOrbs() {
+      ghostOrbsActive = false;
+      orbsVisibilityState = false;
+      
+      if (orbsLoop) {
+        clearTimeout(orbsLoop);
+        orbsLoop = null;
+      }
+      
+      // Remove all existing orbs
+      currentOrbs.forEach(orb => {
+        if (orb.element && orb.element.parentNode) {
+          orb.element.parentNode.removeChild(orb.element);
+        }
+      });
+      currentOrbs = [];
+    }
+    
+    function orbsVisibilityLoop() {
+      if (!ghostOrbsActive) return;
+      
+      if (orbsVisibilityState) {
+        // Currently visible → hide for 2 minutes
+        orbsVisibilityState = false;
+        hideAllOrbs();
+        orbsLoop = setTimeout(() => {
+          orbsVisibilityLoop();
+        }, orbHiddenDuration);
+      } else {
+        // Currently hidden → show for 1 minute
+        orbsVisibilityState = true;
+        createGhostOrbs();
+        orbsLoop = setTimeout(() => {
+          orbsVisibilityLoop();
+        }, orbVisibleDuration);
+      }
+    }
+    
+    function createGhostOrbs() {
+      if (!orbsVisibilityState || cameraMode === 'uv') return;
+      
+      // Remove existing orbs first
+      hideAllOrbs();
+      
+      // Create random number of orbs (1 to maxOrbs)
+      const numOrbs = Math.floor(Math.random() * maxOrbs) + 1;
+      
+      for (let i = 0; i < numOrbs; i++) {
+        setTimeout(() => {
+          if (orbsVisibilityState && ghostOrbsActive) {
+            createSingleOrb();
+          }
+        }, Math.random() * 2000); // Stagger creation over 2 seconds
+      }
+    }
+    
+    function createSingleOrb() {
+      const viewport = document.querySelector('.camera-viewport');
+      if (!viewport) return;
+      
+      const orb = document.createElement('div');
+      orb.className = 'ghost-orb';
+      
+      // Random size (simulates distance)
+      const size = Math.random() * 20 + 10; // 10px to 30px
+      orb.style.width = size + 'px';
+      orb.style.height = size + 'px';
+      
+      // Random opacity (simulates brightness/distance)
+      let opacity = Math.random() * 0.6 + 0.2; // 0.2 to 0.8
+      
+      // Brighter in spirit mode
+      if (cameraMode === 'spirit') {
+        opacity *= 1.5;
+        orb.classList.add('spirit-mode');
+      }
+      
+      orb.style.opacity = Math.min(opacity, 1);
+      
+      // Random horizontal movement
+      const randomX = (Math.random() - 0.5) * 100; // -50px to 50px
+      orb.style.setProperty('--random-x', randomX + 'px');
+      
+      // Random starting position
+      orb.style.left = Math.random() * (viewport.clientWidth - size) + 'px';
+      orb.style.top = viewport.clientHeight + 'px';
+      
+      // Add to viewport
+      viewport.appendChild(orb);
+      
+      // Track orb
+      const orbData = {
+        element: orb,
+        startTime: Date.now()
+      };
+      currentOrbs.push(orbData);
+      
+      // Remove orb after animation (10 seconds)
+      setTimeout(() => {
+        if (orb.parentNode) {
+          orb.parentNode.removeChild(orb);
+        }
+        // Remove from tracking array
+        const index = currentOrbs.findIndex(o => o.element === orb);
+        if (index > -1) {
+          currentOrbs.splice(index, 1);
+        }
+      }, 10000);
+    }
+    
+    function hideAllOrbs() {
+      currentOrbs.forEach(orb => {
+        if (orb.element && orb.element.parentNode) {
+          orb.element.parentNode.removeChild(orb.element);
+        }
+      });
+      currentOrbs = [];
+    }
+    
+    function updateOrbsForMode(mode) {
+      if (mode === 'uv') {
+        // Hide orbs in UV mode
+        hideAllOrbs();
+      } else if (orbsVisibilityState && ghostOrbsActive) {
+        // Recreate orbs for new mode (spirit mode makes them brighter)
+        createGhostOrbs();
       }
     }
 
@@ -1556,7 +1961,6 @@
       
       investigationActive = false;
       gameCode = '';
-      currentScenario = null;
       roomReadyForReadings = false;
       evidenceActive = false;
       currentGhostRoom = null;
@@ -1578,6 +1982,9 @@
       // Stop old ghost activity system
       stopGhostActivity();
       
+      // Cleanup Spirit Cam
+      cleanupSpiritCam();
+      
       stopEMFReadings();
       
       // Hide overlay timer
@@ -1589,7 +1996,22 @@
 
     function backToTools() {
       if (devicePowered) togglePower();
+      cleanupSpiritCam();
       showScreen('toolScreen');
+    }
+    
+    function cleanupSpiritCam() {
+      // Stop camera stream
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+      
+      // Stop ghost orbs
+      stopGhostOrbs();
+      
+      // Turn off flashlight
+      toggleFlashlight(false);
     }
 
     // ===== EMF - ENHANCED WITH BETTER CALIBRATION =====
