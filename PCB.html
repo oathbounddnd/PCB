@@ -1476,20 +1476,52 @@ function onPlayerEntersRoom(roomName) {
   }
 }
 
-    
-    function startRoomTimer() {
-      // No delays - room is immediately ready for events
-      roomReadyForReadings = true;
-      evidenceActive = false;
-      roomEnterTime = Date.now();
-      
-      // Clear any existing timers
-      if (roomTimerInterval) clearInterval(roomTimerInterval);
-      if (evidenceTimer) clearTimeout(evidenceTimer);
-      
-      // Trigger room entry for JSON script system
-      onPlayerEntersRoom();
+// --- Player movement / room entry handler (safe) ---
+function onPlayerEntersRoom(roomName) {
+  // if no room was passed in, just use whatever the game thinks is current
+  if (!roomName) {
+    roomName = currentRoom;
+  }
+
+  // update global
+  currentRoom = roomName;
+
+  console.log(`Player entered room: ${roomName}`);
+
+  // fire JSON triggers like "player_enters_room"
+  // your triggerGhostEvent(...) already exists above
+  triggerGhostEvent('player_enters_room');
+
+  // check if this is the ghost's room (use currentGhostData, not ghost_info)
+  const ghostRoom = currentGhostData?.ghost_info?.location;
+  if (ghostRoom) {
+    // normalise: "Dining Room" -> "dining_room"
+    const normalisedPlayerRoom = roomName.toLowerCase().replace(/\s+/g, '_');
+    if (normalisedPlayerRoom === ghostRoom) {
+      // we're in the ghost room – this is where Spirit Cam orbs are allowed
+      // we don't have to do anything here because the orb event itself starts them
+      // but this block is now SAFE (no ReferenceError)
+      // console.log('Player entered the ghost room.');
     }
+  }
+}
+
+    
+function startRoomTimer() {
+  // No delays - room is immediately ready for events
+  roomReadyForReadings = true;
+  evidenceActive = false;
+  roomEnterTime = Date.now();
+  
+  // Clear any existing timers
+  if (roomTimerInterval) clearInterval(roomTimerInterval);
+  if (evidenceTimer) clearTimeout(evidenceTimer);
+  
+  // Trigger room entry for JSON script system
+  // pass the actual currentRoom so we don't get "undefined"
+  onPlayerEntersRoom(currentRoom);
+}
+
     
     function startEvidenceTimer() {
       if (!currentScenario) return;
