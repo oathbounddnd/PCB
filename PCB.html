@@ -631,8 +631,10 @@
             const horizontalDistance = Math.sqrt(dx * dx + dy * dy);
 
             const verticalDistance = Math.abs((currentPosition.alt || 0) - ghostLocation.alt);
-            const inHorizontalZone = horizontalDistance <= 3;
-            const onSameFloor = verticalDistance <= 1;
+            const DETECTION_RADIUS = 1.5; // set to 1.0 for 1m
+const inHorizontalZone = horizontalDistance <= DETECTION_RADIUS;
+const onSameFloor = verticalDistance <= 1;
+
 
             // Update indoor debug panel
             document.getElementById('ghostX').textContent = ghostLocation.x.toFixed(2) + 'm';
