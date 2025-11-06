@@ -28,8 +28,15 @@
       z-index:1;
     }
     @keyframes staticNoise { 0%{opacity:.5;} 50%{opacity:.8;} 100%{opacity:.5;} }
+    @keyframes shake {
+      0% { transform: translate(0); }
+      25% { transform: translate(-2px, 2px); }
+      50% { transform: translate(2px, -2px); }
+      75% { transform: translate(-2px, -2px); }
+      100% { transform: translate(0); }
+    }
 
-    .screen { position:relative; z-index:2; height:100vh; padding:20px; display:none; }
+    .screen { position:relative; z-index:2; height:100vh; padding:20px; display:none; overflow-y:auto; }
     .screen.active { display:flex; flex-direction:column; }
 
     .centered { justify-content:center; align-items:center; text-align:center; }
@@ -66,10 +73,99 @@
       color:#c0c0c0; letter-spacing:8px; margin-bottom:30px;
     }
 
+    /* Room Selection */
+    .room-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      max-width: 600px;
+      margin: 20px auto;
+    }
+    .room-item {
+      padding: 15px;
+      background: linear-gradient(145deg, #3a3a3a, #2a2a2a);
+      border: 2px solid #555;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    .room-item.selected {
+      border-color: #90EE90;
+      background: linear-gradient(145deg, #3a4a3a, #2a3a2a);
+    }
+    .room-item:hover {
+      border-color: #888;
+    }
+
+    /* Navigation */
+    .room-nav {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      background: rgba(42,42,42,0.9);
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #666;
+      flex-wrap: wrap;
+      max-width: 90vw;
+      justify-content: center;
+    }
+    .nav-btn {
+      padding: 8px 12px;
+      background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+      border: 1px solid #666;
+      color: #c0c0c0;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 10px;
+      min-width: 60px;
+      transition: all 0.3s;
+    }
+    .nav-btn:active { transform: translateY(1px); }
+    
+    /* Travel Indicator */
+    .travel-indicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(42,42,42,0.95);
+      border: 2px solid #666;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      z-index: 1000;
+      min-width: 200px;
+    }
+    .travel-progress {
+      width: 100%;
+      height: 8px;
+      background: #2a2a2a;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .travel-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #90EE90, #66cc66);
+      width: 0%;
+      transition: width 0.1s ease;
+    }
+
     .tool-screen { align-items:center; }
     .header { text-align:center; margin-bottom:30px; width:100%; }
     .timer-display { font-size:32px; color:#90EE90; text-shadow:0 0 10px #90EE90; margin-bottom:20px; }
     .case-info { color:#888; margin-bottom:20px; }
+    .current-room { 
+      font-size: 18px; 
+      color: #90EE90; 
+      margin-bottom: 20px;
+      text-shadow: 0 0 5px #90EE90;
+    }
     .tools-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; max-width:400px; }
     .tool-btn {
       padding:30px 20px; background:linear-gradient(145deg, #383838, #2a2a2a);
@@ -79,7 +175,7 @@
     .tool-icon { font-size:24px; margin-bottom:10px; }
     .tool-name { font-size:16px; font-weight:bold; }
 
-    .emf-container { padding:20px; height:100vh; display:flex; flex-direction:column; position:relative; }
+    .emf-container { padding:20px 20px 100px 20px; height:100vh; display:flex; flex-direction:column; position:relative; }
     .back-btn {
       position:absolute; top:20px; left:20px;
       padding:6px 10px; font-size:12px;
@@ -91,60 +187,258 @@
       background:linear-gradient(135deg, rgba(42,42,42,.9), rgba(26,26,26,.9));
       border:2px solid #606060; padding:12px 18px; margin-bottom:20px; border-radius:8px;
     }
-    .status-led { width:10px; height:10px; border-radius:50%; margin-right:8px; }
-    .status-led.red { background:#8b0000; opacity:.3; }
-    .status-led.green { background:#228b22; }
+    .status-led { 
+      width:12px; height:12px; border-radius:50%; margin-right:8px; 
+      transition: all 0.3s ease;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    .status-led.red { 
+      background: radial-gradient(circle, #ff4444, #8b0000);
+      box-shadow: 0 0 0px rgba(255,68,68,0);
+    }
+    .status-led.red.on { 
+      background: radial-gradient(circle, #ff6666, #ff4444);
+      box-shadow: 0 0 15px rgba(255,68,68,0.8), 0 0 25px rgba(255,68,68,0.4);
+      border-color: #ff6666;
+    }
+    .status-led.green { 
+      background: radial-gradient(circle, #44ff44, #228b22);
+      box-shadow: 0 0 15px rgba(68,255,68,0.8), 0 0 25px rgba(68,255,68,0.4);
+      border-color: #66ff66;
+    }
     .power-button { cursor:pointer; padding:6px 10px; border:1px solid #888; border-radius:4px; }
     .main-display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .emf-meter {
-      width:280px; height:280px; border:4px solid #888; border-radius:50%; position:relative; margin-bottom:30px;
-      background: radial-gradient(circle at 30% 30%, #383838, #2a2a2a), radial-gradient(circle at 70% 70%, #404040, #2a2a2a);
+      width:800px; height:400px; position:relative; margin-bottom:30px;
+      background-image: url('./Dial.png');
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      box-shadow: 
+        inset 0 0 30px rgba(0,0,0,0.5),
+        0 0 20px rgba(0,0,0,0.3);
     }
-    .meter-face { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:240px; height:240px; border-radius:50%; }
-    .dial-numbers, .scale-marks { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); }
-    .dial-number { position:absolute; width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:#b8b8b8; font-weight:bold; }
+    .spike-indicator {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 20px;
+      height: 20px;
+      background: radial-gradient(circle, #ff4444, #8b0000);
+      border-radius: 50%;
+      border: 2px solid #aa2222;
+      opacity: 0;
+      transition: opacity 0.1s ease;
+      box-shadow: 0 0 10px rgba(255,68,68,0.5);
+    }
+    .spike-indicator.flash {
+      opacity: 1;
+      animation: spikeFlash 0.3s ease-in-out;
+    }
+    .spike-indicator.sustained {
+      opacity: 1;
+      animation: sustainedSpike 1s ease-in-out infinite;
+    }
+    @keyframes spikeFlash {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes sustainedSpike {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+    .meter-face { 
+      position:absolute; top:0; left:0; 
+      width:100%; height:100%;
+    }
     .needle {
-      position:absolute; top:50%; left:50%; width:3px; height:100px;
-      background:#c0c0c0; transform-origin:bottom center;
-      transform:translate(-50%, -100%) rotate(-90deg);
-      transition:transform .3s ease;
+      position:absolute; top:50%; left:50%; width:4px; height:120px;
+      background: linear-gradient(to top, #ff6666, #ffaaaa);
+      transform-origin:bottom center;
+      transform:translate(-50%, -50%) rotate(-90deg);
+      transition:transform .4s ease-out;
+      border-radius: 2px;
+      box-shadow: 0 0 8px rgba(255,102,102,0.6);
+      z-index: 10;
+    }
+    .needle-center { 
+      position:absolute; top:50%; left:50%; width:12px; height:12px; 
+      background: radial-gradient(circle, #f0f0f0, #c0c0c0); 
+      border-radius:50%; transform:translate(-50%, -50%);
+      border: 2px solid #888;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      z-index: 15;
     }
     .digital-reading {
-      background:rgba(42,42,42,.6); border:2px solid #606060; border-radius:8px; padding:15px; text-align:center;
+      background: linear-gradient(135deg, rgba(42,42,42,.9), rgba(26,26,26,.9));
+      border:3px solid #606060; border-radius:12px; padding:20px; text-align:center;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
     }
-    .emf-value { font-size:48px; }
+    .emf-value { 
+      font-size:52px; 
+      font-family: 'Courier New', monospace;
+      color: #90EE90;
+      text-shadow: 0 0 10px rgba(144,238,144,0.8);
+      letter-spacing: 2px;
+    }
+    .emf-unit {
+      font-size: 12px;
+      color: #888;
+      margin-top: 8px;
+      font-style: italic;
+    }
 
     .ghost-status {
       position:fixed; top:20px; right:20px;
       background:rgba(42,42,42,0.9); border:1px solid #666; border-radius:5px;
       padding:10px; font-size:12px; color:#888; max-width:240px; z-index:10;
     }
+
+    .scenario-info {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(42,42,42,0.9);
+      border: 1px solid #666;
+      border-radius: 5px;
+      padding: 10px;
+      font-size: 11px;
+      color: #888;
+      max-width: 200px;
+      z-index: 10;
+    }
+    
+    /* GPS Calibrating Message */
+    .gps-message {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(42,42,42,0.95);
+      border: 1px solid #90EE90;
+      border-radius: 5px;
+      padding: 8px 15px;
+      font-size: 12px;
+      color: #90EE90;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .gps-message.show { opacity: 1; }
+    
+    /* Setup Screens */
+    .setup-screen {
+      background: 
+        radial-gradient(circle at 30% 20%, rgba(64, 64, 64, 0.3), transparent 50%),
+        radial-gradient(circle at 70% 80%, rgba(96, 96, 96, 0.2), transparent 50%),
+        linear-gradient(135deg, #2a2a2a, #1a1a1a);
+      color: #c0c0c0;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    .calibration-text {
+      font-size: 16px;
+      margin-bottom: 30px;
+      line-height: 1.6;
+      max-width: 400px;
+      color: #c0c0c0;
+    }
+    .loading-bar {
+      width: 300px;
+      height: 8px;
+      background: #333;
+      border: 1px solid #666;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 20px auto;
+    }
+    .loading-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #90EE90, #66cc66);
+      width: 0%;
+      transition: width 0.1s ease;
+      box-shadow: 0 0 10px rgba(144,238,144,0.5);
+    }
+
+    /* EMF Calibration Controls (Hidden by default, can be enabled for testing) */
+    .emf-calibration {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(42,42,42,0.95);
+      border: 1px solid #666;
+      border-radius: 5px;
+      padding: 8px;
+      font-size: 10px;
+      color: #888;
+      z-index: 1000;
+      display: none; /* Enable for testing: change to 'block' */
+    }
+    .emf-calibration input {
+      width: 50px;
+      font-size: 10px;
+      margin: 2px;
+    }
   </style>
 </head>
 <body>
   <div class="static-overlay"></div>
 
-  <!-- 1) CALIBRATION -->
-  <div id="calibScreen" class="screen centered active">
-    <h2 style="margin-bottom:12px;">Movement Calibration</h2>
-    <p id="calibInstructions" style="max-width:300px; line-height:1.4;">
-      Stand in the centre, face the TV.<br><br>
-      Tap below and walk <strong>5 steps straight forward</strong>.
-    </p>
-    <button class="btn" id="calibActionBtn" onclick="startForwardCalib()">Start Forward</button>
-    <p id="calibProgress" style="margin-top:10px; font-size:12px; color:#aaa;">Forward: 0 / 5</p>
+  <!-- 0) INITIAL CALIBRATION -->
+  <div id="calibrationScreen" class="screen setup-screen active">
+    <div class="pcb-logo" style="margin-bottom: 20px;">PARANORMAL CONTAINMENT BUREAU</div>
+    <div style="font-size: 14px; color: #888; margin-bottom: 40px; font-style: italic;">Investigation Kit v2.1 - Location Calibration Protocol</div>
+    
+    <div class="calibration-text">
+      <strong style="color: #a0a0a0;">LOCATION SCANNING INITIALIZATION</strong><br><br>
+      Stand at primary entry point facing interior.<br>
+      Hold device steady and initiate calibration sequence.
+    </div>
+    <button class="btn" onclick="startHouseCalibration()">Initialize Location Scan</button>
+    <div class="loading-bar" id="calibrationLoader" style="display:none;">
+      <div class="loading-bar-fill" id="calibrationProgress"></div>
+    </div>
+    <div id="calibrationStatus" style="margin-top:15px; color:#90EE90; font-size:12px;"></div>
+  </div>
+
+  <!-- 1) ROOM SELECTION -->
+  <div id="roomScreen" class="screen">
+    <div class="pcb-logo" style="margin-bottom: 10px;">PARANORMAL CONTAINMENT BUREAU</div>
+    <div style="font-size: 14px; color: #888; margin-bottom: 30px; font-style: italic;">Location Mapping - Room Configuration</div>
+    
+    <div style="text-align:center; margin-bottom:30px;">
+      <h2 style="color: #a0a0a0; font-size: 20px;">LOCATION STRUCTURE DETECTED</h2>
+      <p style="color:#888; margin-top:10px; font-size: 14px;">Confirm accessible areas for investigation perimeter</p>
+    </div>
+    <div class="room-grid" id="roomGrid">
+      <!-- Rooms will be populated by JavaScript -->
+    </div>
+    <div style="text-align:center; margin-top:30px;">
+      <button class="btn" onclick="finishRoomSelection()">Confirm Location Parameters</button>
+    </div>
   </div>
 
   <!-- 2) HOME -->
   <div id="homeScreen" class="screen centered">
     <div class="pcb-logo">PARANORMAL CONTAINMENT BUREAU</div>
     <div class="home-subtitle">Investigation Kit v2.1</div>
-    <input type="text" class="game-code-input" id="gameCodeInput" maxlength="4" placeholder="----">
-    <div style="margin-bottom: 20px; color: #888; font-size: 14px;">Enter 4-Digit Case File Code</div>
+    <input type="text" class="game-code-input" id="gameCodeInput" maxlength="3" placeholder="---">
+    <div style="margin-bottom: 20px; color: #888; font-size: 14px;">Enter Case Code (Emailed to Lead Investigator)</div>
     <button class="btn" onclick="startInvestigation()">Start Investigation</button>
-    <div style="margin-top: 40px; font-size: 12px; color: #666;">
-      All players: same spot, same facing, same code.
+    <div id="codeError" style="margin-top: 20px; color: #ff6666; font-size: 14px; display: none;">
+      ❌ Error: Wrong Case Code
     </div>
+    <div style="margin-top: 40px; font-size: 12px; color: #666;">
+      All players: same rooms, same code.
+    </div>
+  </div>
+
+  <!-- GPS Calibrating Message -->
+  <div class="gps-message" id="gpsMessage">
+    📡 Location sensors calibrating... Mapping area parameters
   </div>
 
   <!-- 3) TOOL SELECTION -->
@@ -152,7 +446,7 @@
     <div class="header">
       <h1>PCB Investigation Kit</h1>
       <div class="timer-display" id="timerDisplay">00:00:00</div>
-      <div class="case-info">Case File: <span id="caseCode">----</span> | Status: <span id="investigationStatus">ACTIVE</span></div>
+      <div class="current-room">Current Room: <span id="currentRoomDisplay">Living Room</span></div>
     </div>
     <div class="tools-grid">
       <div class="tool-btn" onclick="openTool('emf')">
@@ -187,87 +481,259 @@
       </div>
       <div class="status-bar">
         <div style="display:flex; align-items:center;">
-          <div class="status-led red" id="powerLed" style="opacity:0.3;"></div>
+          <div class="status-led red" id="powerLed"></div>
           <span class="power-button" id="powerBtn" onclick="togglePower()">POWER</span>
         </div>
         <div style="display:flex; align-items:center;">
-          <div class="status-led red" id="calibLed" style="opacity:0.3;"></div>
+          <div class="status-led green" id="calibLed"></div>
           <span>CALIBRATED</span>
         </div>
         <div style="display:flex; align-items:center;">
-          <div class="status-led red" id="anomalyLed" style="opacity:0.3;"></div>
+          <div class="status-led red" id="anomalyLed"></div>
           <span>ANOMALY</span>
         </div>
       </div>
       <div class="main-display">
         <div class="emf-meter">
+          <div class="spike-indicator" id="spikeIndicator"></div>
           <div class="meter-face">
-            <div class="dial-numbers"></div>
-            <div class="scale-marks"></div>
             <div class="needle"></div>
-            <div class="needle-center" style="position:absolute; top:50%; left:50%; width:16px; height:16px; background:#d0d0d0; border-radius:50%; transform:translate(-50%,-50%);"></div>
+            <div class="needle-center"></div>
           </div>
         </div>
         <div class="digital-reading">
           <div class="emf-value">0.00</div>
-          <div class="emf-unit">Milligauss (Electromagnetic Flux)</div>
+          <div class="emf-unit">EMF Level (0-6 Scale)</div>
         </div>
       </div>
     </div>
+    
+    <!-- Room Navigation -->
+    <div class="room-nav" id="roomNavigation">
+      <!-- Navigation buttons will be populated by JavaScript -->
+    </div>
+  </div>
+
+  <!-- EMF Calibration Controls (for testing - hidden by default) -->
+  <div class="emf-calibration" id="emfCalibration">
+    <div>EMF Dial Calibration</div>
+    <div>Min Angle: <input type="number" id="angleMin" value="-90" onchange="updateDialCalibration()"></div>
+    <div>Max Angle: <input type="number" id="angleMax" value="30" onchange="updateDialCalibration()"></div>
+    <div>Test EMF: <input type="range" min="0" max="6" step="0.1" value="0" id="testEMF" oninput="testEMFReading()"></div>
   </div>
 
   <!-- DEBUG -->
-  <div class="ghost-status">
+  <div class="ghost-status" style="display:none;">
     <div><strong>DEBUG:</strong></div>
-    <div>Calib: <span id="dbgCalibPhase">idle</span></div>
-    <div>Ghost: (<span id="dbgGhostX">--</span>, <span id="dbgGhostY">--</span>)</div>
-    <div>Player: (<span id="dbgPlayerX">--</span>, <span id="dbgPlayerY">--</span>)</div>
-    <div>Steps: <span id="dbgSteps">0</span></div>
+    <div>Rooms: <span id="dbgRoomCount">0</span></div>
+    <div>Current: <span id="dbgCurrentRoom">--</span></div>
+    <div>Ghost: <span id="dbgGhostRoom">--</span></div>
     <div>In Zone: <span id="dbgInZone">NO</span></div>
+  </div>
+
+  <!-- Scenario Info -->
+  <div class="scenario-info" id="scenarioInfo" style="display:none;">
+    <div><strong>Case File:</strong></div>
+    <div>Type: <span id="ghostType">--</span></div>
+    <div>Class: <span id="ghostClass">--</span></div>
+    <div>Room: <span id="ghostRoomInfo">--</span></div>
+    <div>Activity: <span id="activityLevel">--</span></div>
   </div>
 
   <script>
     // ===== GLOBAL STATE =====
-    let currentScreen = 'calibScreen';
+    let currentScreen = 'calibrationScreen';
 
-    // calibration phases: forward -> right -> back -> left -> done
-    let calibPhase = 'idle';
-    let forwardSamples = [];
-    let rightSamples = [];
-    let backSamples = [];
-    let leftSamples = [];
-    const REQUIRED_FORWARD = 5;
-    const REQUIRED_OTHERS = 3;
+    // Available rooms
+    const ALL_ROOMS = [
+      'Porch', 'Living Room', 'Garage', 'Kitchen', 'Stairs', 'Hallway', 
+      'Upstairs Landing', 'Bathroom 1', 'Bathroom 2', 'Bedroom 1', 
+      'Bedroom 2', 'Bedroom 3', 'Bedroom 4', 'Dinning Room', 'Conservatory'
+    ];
 
-    let lastStepTime = 0;
-
-    // signatures
-    let sigForward = null;
-    let sigRight = null;
-    let sigBack = null;
-    let sigLeft = null;
-
-    // game
+    // Game state
+    let availableRooms = [];
+    let currentRoom = 'Living Room';
     let gameCode = '';
+    let currentScenario = null;
     let investigationActive = false;
     let startTime = null;
     let timerInterval = null;
 
-    // movement
-    let playerX = 0;
-    let playerY = 0;
-    let stepCount = 0;
-    let avgStepLength = 0.7;
-
-    // ghost
-    let ghostX = 0;
-    let ghostY = 0;
-
-    // EMF
+    // EMF - Enhanced with calibration
     let devicePowered = false;
     let emfAnimationInterval = null;
     let currentEMF = 0.0;
+    let emfAngleMin = -90;  // Adjustable dial calibration
+    let emfAngleMax = 30;   // Adjustable dial calibration
+    
+    // EMF Audio/Visual effects
+    let audioContext = null;
+    let beepInterval = null;
+    let lastEMFValue = 0;
+    let spikeDetected = false;
+    let spikeFlashInterval = null;
+    
+    // Travel System
+    let isTraveling = false;
+    let travelStartTime = 0;
+    let travelDuration = 3000; // 3 seconds
+    let travelDestination = '';
+    let lastShakeTime = 0;
+    
+    // Room Detection System
+    let roomEnterTime = 0;
+    let roomReadyForReadings = false;
+    let gpsCalibrating = false;
+    let roomTimerInterval = null;
+    let evidenceTimer = null;
+    let evidenceActive = false;
 
+    // Ghost Activity System
+    let ghostEventTimer = null;
+    let ghostActivityActive = false;
+
+    // ===== GHOST DATA SYSTEM (JSON-based) =====
+    let currentGhostData = null;
+    let ghostTimeline = [];
+    let timelinePosition = 0;
+    let gameStartTime = 0;
+    let ghostEventQueue = [];
+    let eventProcessingInterval = null;
+
+    // ===== FILE-BASED GHOST DATA SYSTEM =====
+    let loadedGhostFiles = {}; // Store loaded files in memory
+
+    // Scenarios data (embedded for local file usage - fallback)
+    let scenariosData = {
+      scenarios: {
+        "100": {
+          entity_type: "Spirit (T-S)",
+          class: "Class II - Disruptive", 
+          class_level: 2,
+          supplementary: "S",
+          room: "Living Room",
+          description: "Residual human consciousness of former homeowner. Attached to familiar surroundings.",
+          emf_base: 2.8,
+          activity_level: "Medium",
+          aggressiveness: 0.3,
+          evidence: ["Ghost Orbs", "Spirit Box", "EMF Level 5"],
+          has_emf: true,
+          behavior: "Moves furniture, responds to questions, seeks acknowledgment",
+          events: [],
+          special_behaviors: {}
+        }
+      }
+    };
+
+    // JSON Scenario Loading System
+    async function loadScenarioJSON(code) {
+      try {
+        const response = await fetch(`./scenario_${code}.json`);
+        if (!response.ok) {
+          throw new Error(`Scenario ${code} not found`);
+        }
+        const scenarioData = await response.json();
+        return scenarioData;
+      } catch (error) {
+        console.log(`Failed to load scenario_${code}.json, using embedded data:`, error);
+        return null;
+      }
+    }
+    
+    // ===== NEW GHOST DATA LOADING SYSTEM =====
+    async function loadGhostDataJSON(code) {
+      try {
+        // Load from Games/ folder: Games/104.json
+        const response = await fetch(`./Games/${code}.json`);
+        if (!response.ok) {
+          throw new Error(`Ghost data Games/${code}.json not found`);
+        }
+        const ghostDataText = await response.text();
+        
+        console.log('Raw ghost data text loaded successfully');
+        
+        // Process the file content to handle the custom syntax
+        const processedContent = processGhostDataSyntax(ghostDataText);
+        
+        console.log('Ghost data processed successfully');
+        
+        // Parse as JSON
+        const ghostData = JSON.parse(processedContent);
+        
+        console.log('Loaded ghost data from JSON file:', ghostData);
+        return ghostData;
+      } catch (error) {
+        console.error('Failed to load ghost data:', error.message);
+        
+        if (error.message.includes('NetworkError') || error.message.includes('CORS')) {
+          alert('❌ CORS Error: Please run a local HTTP server!\n\nSolutions:\n1. Use START_SERVER.bat\n2. Or run: python -m http.server 8000');
+        }
+        
+        return null;
+      }
+    }
+    
+    function processGhostDataSyntax(content) {
+      console.log('Processing content:', content);
+      
+      // Remove comment lines
+      content = content.replace(/\/\/ .+\n/g, '');
+      
+      // Simple approach: convert the 104.json format step by step
+      
+      // First, handle the timeline section manually
+      if (content.includes('"timeline": new Sequence()')) {
+        // Extract the timeline events manually
+        const timelineEvents = [
+          { effect: "emf_spike", time: 3, emf_spike: 5.1, duration: 3, audio: "angry_growl.mp3" },
+          { effect: "emf_spike", time: 7, emf_spike: 5.6, duration: 4, audio: "chair_scrape.mp3" },
+          { effect: "emf_spike", time: 12, emf_spike: 5.9, duration: 5, audio: "door_slam.mp3" },
+          { effect: "emf_spike", time: 18, emf_spike: 5.3, duration: 4, audio: "heavy_breathing.mp3" },
+          { effect: "emf_spike", time: 24, emf_spike: 5.8, duration: 6, audio: "angry_voice.mp3" }
+        ];
+        
+        // Replace the entire timeline section
+        content = content.replace(
+          /"timeline":\s*new Sequence\(\)[\s\S]*?(?=,\s*"triggers")/,
+          `"timeline": ${JSON.stringify(timelineEvents)}`
+        );
+      }
+      
+      // Handle triggers
+      content = content.replace(
+        /new Sequence\(\)\.effect\("emf_spike"\)\.emf_spike\(5\.1\)\.duration\(2\)\.audio\("footsteps\.mp3"\)/g,
+        JSON.stringify({ effect: "emf_spike", emf_spike: 5.1, duration: 2, audio: "footsteps.mp3" })
+      );
+      
+      content = content.replace(
+        /new Sequence\(\)\.effect\("emf_spike"\)\.emf_spike\(2\.8\)\.duration\(3\)\.audio\("door_creak\.mp3"\)/g,
+        JSON.stringify({ effect: "emf_spike", emf_spike: 2.8, duration: 3, audio: "door_creak.mp3" })
+      );
+      
+      content = content.replace(
+        /new Sequence\(\)\.effect\("emf_spike"\)\.emf_spike\(4\.1\)\.duration\(3\)\.audio\("male_voice_angry\.mp3"\)/g,
+        JSON.stringify({ effect: "emf_spike", emf_spike: 4.1, duration: 3, audio: "male_voice_angry.mp3" })
+      );
+      
+      console.log('Final processed content:', content);
+      return content;
+    }
+
+    async function loadScenario(code) {
+      // Try to load external JSON first
+      let scenario = await loadScenarioJSON(code);
+      
+      // Fall back to embedded data if JSON fails
+      if (!scenario && scenariosData.scenarios[code]) {
+        scenario = scenariosData.scenarios[code];
+        // Add missing fields for embedded scenarios
+        scenario.events = scenario.events || [];
+        scenario.special_behaviors = scenario.special_behaviors || {};
+      }
+      
+      return scenario;
+    }
     // ===== UI HELPERS =====
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -276,206 +742,763 @@
     }
 
     function updateDebug() {
-      document.getElementById('dbgCalibPhase').textContent = calibPhase;
-      document.getElementById('dbgGhostX').textContent = ghostX ? ghostX.toFixed(2) : '--';
-      document.getElementById('dbgGhostY').textContent = ghostY ? ghostY.toFixed(2) : '--';
-      document.getElementById('dbgPlayerX').textContent = playerX.toFixed(2);
-      document.getElementById('dbgPlayerY').textContent = playerY.toFixed(2);
-      document.getElementById('dbgSteps').textContent = stepCount;
+      document.getElementById('dbgRoomCount').textContent = availableRooms.length;
+      document.getElementById('dbgCurrentRoom').textContent = currentRoom;
+      document.getElementById('dbgGhostRoom').textContent = currentScenario ? currentScenario.room : '--';
+      document.getElementById('dbgInZone').textContent = 
+        (currentScenario && currentRoom === currentScenario.room) ? 'YES' : 'NO';
     }
 
-    // ===== CALIBRATION =====
-    function startForwardCalib() {
-      calibPhase = 'forward';
-      document.getElementById('calibInstructions').textContent =
-        'Walk 5 normal steps straight ahead.';
-      document.getElementById('calibActionBtn').style.display = 'none';
-      document.getElementById('calibProgress').textContent = 'Forward: 0 / 5';
+    // ===== HOUSE CALIBRATION =====
+    function startHouseCalibration() {
+      document.getElementById('calibrationLoader').style.display = 'block';
+      document.querySelector('.calibration-text').style.opacity = '0.5';
+      document.querySelector('.btn').style.display = 'none';
+      
+      const progress = document.getElementById('calibrationProgress');
+      const status = document.getElementById('calibrationStatus');
+      
+      let currentProgress = 0;
+      const totalTime = 8000 + Math.random() * 4000; // 8-12 seconds
+      const updateInterval = 100;
+      
+      status.textContent = 'Initializing electromagnetic field mapping...';
+      
+      const progressInterval = setInterval(() => {
+        currentProgress += (updateInterval / totalTime) * 100;
+        progress.style.width = Math.min(currentProgress, 100) + '%';
+        
+        if (currentProgress >= 25 && currentProgress < 50) {
+          status.textContent = 'Scanning structural layout and dimensions...';
+        } else if (currentProgress >= 50 && currentProgress < 75) {
+          status.textContent = 'Calibrating paranormal detection sensors...';
+        } else if (currentProgress >= 75 && currentProgress < 95) {
+          status.textContent = 'Establishing baseline electromagnetic readings...';
+        } else if (currentProgress >= 95) {
+          status.textContent = 'Location parameters successfully configured.';
+        }
+        
+        if (currentProgress >= 100) {
+          clearInterval(progressInterval);
+          setTimeout(() => {
+            showScreen('roomScreen');
+            populateRoomGrid();
+          }, 1000);
+        }
+      }, updateInterval);
+    }
+
+    // ===== ROOM SELECTION =====
+    function populateRoomGrid() {
+      const grid = document.getElementById('roomGrid');
+      grid.innerHTML = '';
+      
+      ALL_ROOMS.forEach(room => {
+        const roomDiv = document.createElement('div');
+        roomDiv.className = 'room-item';
+        roomDiv.textContent = room;
+        roomDiv.onclick = () => toggleRoom(room, roomDiv);
+        grid.appendChild(roomDiv);
+      });
+    }
+
+    function toggleRoom(room, element) {
+      if (availableRooms.includes(room)) {
+        availableRooms = availableRooms.filter(r => r !== room);
+        element.classList.remove('selected');
+      } else {
+        availableRooms.push(room);
+        element.classList.add('selected');
+      }
       updateDebug();
     }
 
-    function startRightCalib() {
-      calibPhase = 'right';
-      document.getElementById('calibInstructions').textContent =
-        'Turn RIGHT ~90° and walk 3 steps.';
-      document.getElementById('calibProgress').textContent = 'Right: 0 / 3';
+    function finishRoomSelection() {
+      if (availableRooms.length < 1) {
+        alert('Please select at least 1 room');
+        return;
+      }
+      
+      // Set default current room to first selected room (or Living Room if available)
+      if (availableRooms.includes('Living Room')) {
+        currentRoom = 'Living Room';
+      } else {
+        currentRoom = availableRooms[0];
+      }
+      
+      showScreen('homeScreen');
       updateDebug();
     }
 
-    function startBackCalib() {
-      calibPhase = 'back';
-      document.getElementById('calibInstructions').textContent =
-        'Turn BACK (180°) and walk 3 steps.';
-      document.getElementById('calibProgress').textContent = 'Back: 0 / 3';
+    // ===== ROOM NAVIGATION =====
+    function createRoomNavigation() {
+      const nav = document.getElementById('roomNavigation');
+      nav.innerHTML = '';
+      
+      availableRooms.forEach(room => {
+        const btn = document.createElement('div');
+        btn.className = 'nav-btn';
+        btn.textContent = room.length > 8 ? room.substring(0,7) + '...' : room;
+        
+        if (room === currentRoom) {
+          btn.style.background = 'linear-gradient(145deg, #4a6a4a, #2a4a2a)';
+          btn.style.borderColor = '#90EE90';
+        } else if (isTraveling) {
+          btn.classList.add('disabled');
+        } else {
+          btn.onclick = () => startTravel(room);
+        }
+        
+        nav.appendChild(btn);
+      });
+    }
+
+    function startTravel(room) {
+      if (room === currentRoom) return;
+      
+      // Instant travel - no delays
+      currentRoom = room;
+      document.getElementById('currentRoomDisplay').textContent = currentRoom;
+      
+      // Start room timer (now instant)
+      startRoomTimer();
+      
+      // Trigger ghost events for room entry
+      triggerGhostEvent('player_enters_room');
+      
+      createRoomNavigation();
       updateDebug();
     }
-
-    function startLeftCalib() {
-      calibPhase = 'left';
-      document.getElementById('calibInstructions').textContent =
-        'Turn LEFT ~90° and walk 3 steps.';
-      document.getElementById('calibProgress').textContent = 'Left: 0 / 3';
-      updateDebug();
+    // ===== NEW JSON EVENT SYSTEM =====
+    let currentGhostRoom = null; // Track where ghost currently is
+    let timelineCheckInterval = null;
+    
+    function onPlayerEntersRoom() {
+      // Trigger for JSON ghost responses
+      if (!currentScenario || !currentScenario.TRIGGER_RESPONSES) return;
+      
+      const trigger = currentScenario.TRIGGER_RESPONSES['player_enters_room'];
+      if (trigger && trigger.enabled) {
+        executeRandomTriggerResponse(trigger);
+      }
     }
-
-    function buildSignature(samples) {
-      if (!samples.length) return null;
-      let sx=0, sy=0, sz=0;
-      samples.forEach(s => { sx+=s.x; sy+=s.y; sz+=s.z; });
-      const n = samples.length;
-      const v = { x: sx/n, y: sy/n, z: sz/n };
-      const m = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-      return m ? { x:v.x/m, y:v.y/m, z:v.z/m } : {x:0,y:0,z:0};
+    
+    function executeRandomTriggerResponse(trigger) {
+      if (!trigger.possible_responses || trigger.possible_responses.length === 0) return;
+      
+      // Only execute if player is in ghost room
+      if (currentRoom !== getCurrentGhostRoom()) return;
+      
+      const randomResponse = trigger.possible_responses[Math.floor(Math.random() * trigger.possible_responses.length)];
+      executeEvent(randomResponse);
     }
-
-    function finishCalibration() {
-      calibPhase = 'done';
-      sigForward = buildSignature(forwardSamples);
-      sigRight   = buildSignature(rightSamples);
-      sigBack    = buildSignature(backSamples);
-      sigLeft    = buildSignature(leftSamples);
-
-      document.getElementById('calibInstructions').textContent =
-        'Calibration complete. Continue to case code.';
-      const btn = document.getElementById('calibActionBtn');
-      btn.style.display = 'inline-block';
-      btn.textContent = 'Continue';
-      btn.onclick = () => showScreen('homeScreen');
-      document.getElementById('calibProgress').textContent = '';
-      updateDebug();
+    
+    function getCurrentGhostRoom() {
+      // Return current ghost location (can change for mobile ghosts)
+      return currentGhostRoom || (currentScenario ? currentScenario.GHOST_INFO.location : null);
     }
-
-    function normalizeVec(v) {
-      const m = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
-      if (!m) return {x:0,y:0,z:0};
-      return {x:v.x/m, y:v.y/m, z:v.z/m};
+    
+    function startTimelineSystem() {
+      // Handle old scenario format
+      if (currentScenario && currentScenario.TIMELINE_EVENTS) {
+        // Check timeline events every minute
+        timelineCheckInterval = setInterval(() => {
+          checkTimelineEvents();
+        }, 60000);
+        setTimeout(checkTimelineEvents, 1000);
+        return;
+      }
+      
+      // Handle new ghost data format
+      if (currentGhostData && currentGhostData.timeline) {
+        gameStartTime = Date.now();
+        startGhostTimeline();
+        return;
+      }
     }
-
-    // ===== DEVICE MOTION =====
-    if (window.DeviceMotionEvent) {
-      window.addEventListener('devicemotion', function(e){
-        const now = Date.now();
-        const acc = e.acceleration && e.acceleration.x !== null ? e.acceleration : e.accelerationIncludingGravity;
-        if (!acc) return;
-
-        const mag = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z);
-        if (mag > 3.8 && (now - lastStepTime) > 200) {
-          lastStepTime = now;
-          const sample = normalizeVec({x:acc.x, y:acc.y, z:acc.z});
-
-          if (calibPhase === 'forward') {
-            forwardSamples.push(sample);
-            document.getElementById('calibProgress').textContent =
-              'Forward: '+forwardSamples.length+' / '+REQUIRED_FORWARD;
-            if (forwardSamples.length >= REQUIRED_FORWARD) {
-              // we can estimate step length here if you want, for now keep 0.7
-              startRightCalib();
+    
+    // ===== NEW GHOST TIMELINE SYSTEM =====
+    function startGhostTimeline() {
+      if (!currentGhostData || !currentGhostData.timeline) return;
+      
+      console.log('Starting ghost timeline system');
+      
+      // Timeline is now a processed array of events
+      const timelineEvents = currentGhostData.timeline;
+      
+      if (!timelineEvents || !Array.isArray(timelineEvents)) {
+        console.log('No valid timeline events found');
+        return;
+      }
+      
+      console.log('Timeline events:', timelineEvents);
+      
+      // Schedule all timeline events
+      timelineEvents.forEach((event, index) => {
+        if (event.time !== undefined) {
+          const delay = event.time * 1000; // Convert seconds to milliseconds
+          console.log(`Scheduling event ${index} for ${event.time} seconds:`, event);
+          setTimeout(() => {
+            if (investigationActive) {
+              executeGhostEvent(event);
             }
-          } else if (calibPhase === 'right') {
-            rightSamples.push(sample);
-            document.getElementById('calibProgress').textContent =
-              'Right: '+rightSamples.length+' / '+REQUIRED_OTHERS;
-            if (rightSamples.length >= REQUIRED_OTHERS) {
-              startBackCalib();
-            }
-          } else if (calibPhase === 'back') {
-            backSamples.push(sample);
-            document.getElementById('calibProgress').textContent =
-              'Back: '+backSamples.length+' / '+REQUIRED_OTHERS;
-            if (backSamples.length >= REQUIRED_OTHERS) {
-              startLeftCalib();
-            }
-          } else if (calibPhase === 'left') {
-            leftSamples.push(sample);
-            document.getElementById('calibProgress').textContent =
-              'Left: '+leftSamples.length+' / '+REQUIRED_OTHERS;
-            if (leftSamples.length >= REQUIRED_OTHERS) {
-              finishCalibration();
-            }
-          } else if (calibPhase === 'done' && investigationActive) {
-            handleGameplayStep(sample);
+          }, delay);
+        }
+      });
+      
+      // Start continuous event checking
+      if (eventProcessingInterval) clearInterval(eventProcessingInterval);
+      eventProcessingInterval = setInterval(() => {
+        processGhostEventQueue();
+      }, 100); // Check every 100ms for smooth event processing
+    }
+    
+    function executeGhostEvent(event) {
+      console.log('Executing ghost event:', event);
+      
+      // Check if player is in ghost room (some events only trigger there)
+      const ghostRoom = currentGhostData.ghost_info.location;
+      const playerInGhostRoom = (currentRoom.toLowerCase().replace(/\s+/g, '_') === ghostRoom);
+      
+      // EMF Spike events
+      if (event.effect === 'emf_spike' && event.emf_spike) {
+        triggerEMFSpike(event.emf_spike, event.duration || 3);
+      }
+      
+      // Auto events (these work regardless of syntax)
+      if (event.effect === 'door_slam') {
+        triggerDoorSlam();
+      } else if (event.effect === 'door_creak') {
+        triggerDoorCreak();
+      } else if (event.effect === 'lights_flicker') {
+        triggerLightsFlicker();
+      } else if (event.effect === 'screen_shake') {
+        triggerScreenShake();
+      }
+      
+      // Ghost movement
+      if (event.ghost_moves_to) {
+        currentGhostRoom = event.ghost_moves_to;
+        console.log(`Ghost moved to: ${currentGhostRoom}`);
+      }
+      
+      // Audio events (now with real playback from Games/Audio/)
+      if (event.audio) {
+        const audioPath = `./Games/Audio/${event.audio}`;
+        const volume = event.volume || 'medium';
+        playGhostAudio(audioPath, volume);
+      }
+    }
+    
+    // ===== AUDIO PLAYBACK SYSTEM =====
+    function playGhostAudio(audioPath, volume = 'medium') {
+      console.log(`Playing audio: ${audioPath} at ${volume} volume`);
+      
+      try {
+        const audio = new Audio(audioPath);
+        
+        // Set volume based on level
+        switch(volume.toLowerCase()) {
+          case 'quiet':
+            audio.volume = 0.3;
+            break;
+          case 'medium':
+            audio.volume = 0.6;
+            break;
+          case 'loud':
+            audio.volume = 0.9;
+            break;
+          default:
+            audio.volume = 0.6;
+        }
+        
+        // Play the audio
+        audio.play().catch(error => {
+          console.log(`Failed to play audio ${audioPath}:`, error);
+          // Fallback: Show visual indicator if audio fails
+          showAudioIndicator(audioPath, volume);
+        });
+        
+        // Clean up after audio ends
+        audio.addEventListener('ended', () => {
+          audio.src = '';
+        });
+        
+      } catch (error) {
+        console.log(`Error loading audio ${audioPath}:`, error);
+        showAudioIndicator(audioPath, volume);
+      }
+    }
+    
+    function showAudioIndicator(audioPath, volume) {
+      // Visual fallback if audio doesn't work
+      const filename = audioPath.split('/').pop();
+      
+      // Create temporary audio indicator
+      const indicator = document.createElement('div');
+      indicator.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(42,42,42,0.95); border: 2px solid #666; border-radius: 8px;
+        padding: 15px; text-align: center; z-index: 2000; color: #c0c0c0;
+        font-size: 14px; min-width: 200px;
+      `;
+      indicator.innerHTML = `
+        🔊 Audio: ${filename}<br>
+        <small>Volume: ${volume}</small>
+      `;
+      
+      document.body.appendChild(indicator);
+      
+      // Remove after 2 seconds
+      setTimeout(() => {
+        if (indicator.parentNode) {
+          indicator.parentNode.removeChild(indicator);
+        }
+      }, 2000);
+    }
+    
+    function processGhostEventQueue() {
+      // Process any queued events (for future trigger system)
+      while (ghostEventQueue.length > 0) {
+        const event = ghostEventQueue.shift();
+        executeGhostEvent(event);
+      }
+    }
+    
+    // ===== GHOST EVENT FUNCTIONS =====
+    function triggerEMFSpike(value, duration = 3) {
+      if (!devicePowered) return;
+      
+      console.log(`EMF Spike: ${value} for ${duration} seconds`);
+      
+      // Store original EMF value
+      const originalEMF = currentEMF;
+      
+      // Set EMF to spike value
+      currentEMF = value;
+      updateEMFDisplay(currentEMF);
+      
+      // Turn on anomaly LED
+      document.getElementById('anomalyLed').classList.add('on');
+      
+      // Restore normal EMF after duration
+      setTimeout(() => {
+        currentEMF = originalEMF;
+        updateEMFDisplay(currentEMF);
+        document.getElementById('anomalyLed').classList.remove('on');
+      }, duration * 1000);
+    }
+    
+    function triggerDoorSlam() {
+      console.log('Door slam event');
+      // Auto plays sound + EMF 4.2 + shake
+      triggerEMFSpike(4.2, 2);
+      triggerScreenShake();
+      playGhostAudio('./Games/Audio/door_slam.mp3', 'loud');
+    }
+    
+    function triggerDoorCreak() {
+      console.log('Door creak event');
+      // Auto plays sound + EMF 2.8
+      triggerEMFSpike(2.8, 3);
+      playGhostAudio('./Games/Audio/door_creak.mp3', 'medium');
+    }
+    
+    function triggerLightsFlicker() {
+      console.log('Lights flicker event');
+      // Auto flickers for 3 seconds
+      const body = document.body;
+      let flickerCount = 0;
+      const flickerInterval = setInterval(() => {
+        body.style.filter = flickerCount % 2 === 0 ? 'brightness(0.3)' : 'brightness(1)';
+        flickerCount++;
+        if (flickerCount >= 6) { // 3 seconds of flickering
+          clearInterval(flickerInterval);
+          body.style.filter = 'brightness(1)';
+        }
+      }, 500);
+    }
+    
+    function triggerScreenShake() {
+      console.log('Screen shake event');
+      const body = document.body;
+      body.style.animation = 'shake 0.5s ease-in-out';
+      setTimeout(() => {
+        body.style.animation = '';
+      }, 500);
+    }
+    
+    // ===== GHOST TRIGGER SYSTEM =====
+    function triggerGhostEvent(triggerName) {
+      if (!currentGhostData || !currentGhostData.triggers) return;
+      
+      const trigger = currentGhostData.triggers[triggerName];
+      if (!trigger || !Array.isArray(trigger)) return;
+      
+      console.log(`Ghost trigger activated: ${triggerName}`);
+      
+      // Execute a random response from the trigger array
+      const randomResponse = trigger[Math.floor(Math.random() * trigger.length)];
+      if (randomResponse) {
+        console.log('Executing trigger response:', randomResponse);
+        // Trigger response is now a processed object, not a Sequence
+        executeGhostEvent(randomResponse);
+      }
+    }
+    
+    function checkTimelineEvents() {
+      if (!investigationActive || !currentScenario) return;
+      
+      const currentMinutes = Math.floor((Date.now() - startTime) / 60000);
+      const timelineKey = currentMinutes + '_minutes';
+      
+      if (currentScenario.TIMELINE_EVENTS[timelineKey]) {
+        const event = currentScenario.TIMELINE_EVENTS[timelineKey];
+        
+        // Only execute if player is in ghost room
+        if (currentRoom === getCurrentGhostRoom()) {
+          executeTimelineEvent(event);
+        }
+      }
+    }
+    
+    function executeTimelineEvent(event) {
+      console.log(`Timeline Event: ${event.description}`);
+      
+      // Check if this is a ghost movement event
+      if (event.ghost_moves_to) {
+        currentGhostRoom = event.ghost_moves_to;
+        console.log(`Ghost moved to: ${currentGhostRoom}`);
+      }
+      
+      // Execute the event effects
+      if (event.effects) {
+        executeEvent(event.effects);
+      }
+    }
+    
+    function executeEvent(eventData) {
+      if (!eventData.event) return;
+      
+      console.log(`Executing Event: ${eventData.event}`);
+      
+      switch(eventData.event) {
+        case 'emf_spike_minor':
+          spikeEMF(eventData.emf_spike || 5.1, (eventData.duration_seconds || 2) * 1000);
+          if (eventData.audio) playAudioFile(eventData.audio);
+          break;
+          
+        case 'emf_spike_major':
+          spikeEMF(eventData.emf_spike || 5.8, (eventData.duration_seconds || 4) * 1000);
+          if (eventData.audio) playAudioFile(eventData.audio);
+          break;
+          
+        case 'play_audio':
+          if (eventData.audio) playAudioFile(eventData.audio, eventData.volume);
+          if (eventData.emf_spike) spikeEMF(eventData.emf_spike, 3000);
+          break;
+          
+        case 'door_slam':
+          playAudioFile('door_slam.mp3', 'loud');
+          spikeEMF(4.2, 3000);
+          triggerScreenShake();
+          break;
+          
+        case 'door_creak':
+          playAudioFile('door_creak.mp3', 'quiet');
+          spikeEMF(2.8, 3000);
+          break;
+          
+        case 'lights_flicker':
+          triggerLightFlicker(eventData.duration_seconds || 3);
+          spikeEMF(3.1, 2000);
+          break;
+      }
+    }
+    
+    function spikeEMF(level, durationMs) {
+      if (!devicePowered) return;
+      
+      const originalEMF = currentEMF;
+      currentEMF = level;
+      updateEMFDisplay(currentEMF);
+      
+      // Return to baseline after duration
+      setTimeout(() => {
+        currentEMF = originalEMF;
+        updateEMFDisplay(currentEMF);
+      }, durationMs);
+    }
+    
+    function playAudioFile(filename, volume = 'medium') {
+      // Placeholder for audio system
+      console.log(`Playing audio: ${filename} at ${volume} volume`);
+      // Will implement actual audio loading/playing later
+    }
+    
+    function triggerScreenShake() {
+      document.body.style.animation = 'shake 0.5s';
+      setTimeout(() => {
+        document.body.style.animation = '';
+      }, 500);
+    }
+    
+    function triggerLightFlicker(durationSeconds) {
+      // Placeholder for light flicker effect
+      console.log(`Lights flicker for ${durationSeconds} seconds`);
+    }
+    
+    function showGPSMessage() {
+      const gpsMsg = document.getElementById('gpsMessage');
+      gpsMsg.classList.add('show');
+      
+      setTimeout(() => {
+        gpsMsg.classList.remove('show');
+      }, 3000);
+    }
+    
+    function startRoomTimer() {
+      // No delays - room is immediately ready for events
+      roomReadyForReadings = true;
+      evidenceActive = false;
+      roomEnterTime = Date.now();
+      
+      // Clear any existing timers
+      if (roomTimerInterval) clearInterval(roomTimerInterval);
+      if (evidenceTimer) clearTimeout(evidenceTimer);
+      
+      // Trigger room entry for JSON script system
+      onPlayerEntersRoom();
+    }
+    
+    function startEvidenceTimer() {
+      if (!currentScenario) return;
+      
+      // Calculate evidence delay based on aggressiveness (10s-60s)
+      const baseDelay = 10000; // 10 seconds minimum
+      const maxDelay = 60000; // 60 seconds maximum
+      const aggressiveness = currentScenario.aggressiveness || 0.5;
+      
+      // More aggressive = faster evidence (inverted)
+      const delay = baseDelay + ((1 - aggressiveness) * (maxDelay - baseDelay));
+      
+      evidenceTimer = setTimeout(() => {
+        if (currentRoom === currentScenario.room && roomReadyForReadings) {
+          evidenceActive = true;
+          // Could trigger visual/audio evidence here in future
+        }
+      }, delay);
+    }
+
+    function startGhostActivity() {
+      if (!currentScenario || !investigationActive) return;
+      
+      // Only start activity for ghosts with EMF evidence
+      if (!currentScenario.has_emf) return;
+      
+      ghostActivityActive = true;
+      scheduleScenarioEvents();
+    }
+
+    function scheduleScenarioEvents() {
+      if (!ghostActivityActive || !currentScenario) return;
+      
+      // Clear any existing timers
+      if (ghostEventTimer) clearTimeout(ghostEventTimer);
+      
+      // Use JSON event timeline if available, otherwise fall back to old system
+      if (currentScenario.events && currentScenario.events.length > 0) {
+        scheduleJSONEvents();
+      } else {
+        scheduleClassBasedEvents(); // Fallback for embedded scenarios
+      }
+    }
+
+    function scheduleJSONEvents() {
+      const events = currentScenario.events;
+      
+      events.forEach(event => {
+        const delayMs = event.time_seconds * 1000;
+        
+        setTimeout(() => {
+          if (ghostActivityActive && investigationActive) {
+            triggerJSONEvent(event);
           }
-        }
+        }, delayMs);
       });
     }
 
-    // ===== GAMEPLAY STEP CLASSIFICATION =====
-    function handleGameplayStep(sampleVec) {
-      // compare to 4 signatures
-      const candidates = [];
-      if (sigForward) candidates.push({name:'forward', sig:sigForward});
-      if (sigRight)   candidates.push({name:'right',   sig:sigRight});
-      if (sigBack)    candidates.push({name:'back',    sig:sigBack});
-      if (sigLeft)    candidates.push({name:'left',    sig:sigLeft});
-
-      let bestName = null;
-      let bestDot = -999;
-      candidates.forEach(c => {
-        const dot = c.sig.x*sampleVec.x + c.sig.y*sampleVec.y + c.sig.z*sampleVec.z;
-        if (dot > bestDot) {
-          bestDot = dot;
-          bestName = c.name;
-        }
-      });
-
-      // move according to direction
-      switch (bestName) {
-        case 'forward': playerX += avgStepLength; break;
-        case 'back':    playerX -= avgStepLength; break;
-        case 'right':   playerY += avgStepLength; break;
-        case 'left':    playerY -= avgStepLength; break;
+    function scheduleClassBasedEvents() {
+      // Fallback to old random system for embedded scenarios
+      const classLevel = currentScenario.class_level || 2;
+      let minMinutes, maxMinutes;
+      
+      switch(classLevel) {
+        case 1: minMinutes = 8; maxMinutes = 15; break;
+        case 2: minMinutes = 5; maxMinutes = 12; break;
+        case 3: minMinutes = 3; maxMinutes = 8; break;
+        case 4: minMinutes = 2; maxMinutes = 6; break;
+        case 5: minMinutes = 1; maxMinutes = 4; break;
+        default: minMinutes = 5; maxMinutes = 12; break;
       }
-      stepCount++;
-      checkGhostZone();
-      updateDebug();
+      
+      const randomMinutes = minMinutes + Math.random() * (maxMinutes - minMinutes);
+      const delayMs = randomMinutes * 60 * 1000;
+      
+      ghostEventTimer = setTimeout(() => {
+        triggerGhostEvent();
+        scheduleClassBasedEvents(); // Schedule next random event
+      }, delayMs);
     }
 
+    function triggerJSONEvent(event) {
+      if (!currentScenario || !devicePowered || !roomReadyForReadings) return;
+      if (currentRoom !== currentScenario.room) return;
+      if (!currentScenario.has_emf) return;
+      
+      // Execute the specific event from JSON
+      switch(event.type) {
+        case 'emf_spike':
+          forceEMFSpike(event.intensity, event.duration_ms);
+          console.log(`EMF Event: ${event.description} (${event.intensity} EMF for ${event.duration_ms}ms)`);
+          break;
+        // Future: Add other event types like 'spirit_box_response', 'camera_interference', etc.
+      }
+    }
+
+    function triggerGhostEvent() {
+      if (!currentScenario || !devicePowered || !roomReadyForReadings) return;
+      
+      // Only trigger if player is in ghost room
+      if (currentRoom !== currentScenario.room) return;
+      
+      // Only trigger for ghosts with EMF evidence
+      if (!currentScenario.has_emf) return;
+      
+      // Create EMF spike event
+      const spikeIntensity = Math.random() * 0.8 + 0.2; // 0.2 to 1.0
+      const targetEMF = 5.0 + (spikeIntensity * 1.0); // 5.0 to 6.0 EMF spike
+      
+      // Force EMF spike for event
+      forceEMFSpike(targetEMF, 2000 + Math.random() * 3000); // 2-5 second spike
+    }
+
+    function forceEMFSpike(targetValue, durationMs) {
+      const originalEMF = currentEMF;
+      
+      // Rapidly increase to spike value
+      currentEMF = targetValue;
+      updateEMFDisplay(currentEMF);
+      
+      // Hold spike for duration, then return to normal
+      setTimeout(() => {
+        currentEMF = originalEMF;
+        updateEMFDisplay(currentEMF);
+      }, durationMs);
+    }
+
+    function stopGhostActivity() {
+      ghostActivityActive = false;
+      if (ghostEventTimer) {
+        clearTimeout(ghostEventTimer);
+        ghostEventTimer = null;
+      }
+    }
+    
     // ===== INVESTIGATION =====
-    function caseCodeToDistance(code) {
-      let sum=0;
-      for (let i=0;i<code.length;i++) {
-        const d = parseInt(code[i],10);
-        if (!isNaN(d)) sum += d;
-      }
-      const t = (sum % 37) / 36; // 0..1
-      return 2 + t * 2; // 2..4m
-    }
-    function caseCodeToAngle(code) {
-      const n = parseInt(code,10);
-      if (isNaN(n)) return 0;
-      return n % 360;
-    }
-
-    function startInvestigation() {
+    async function startInvestigation() {
       const input = document.getElementById('gameCodeInput');
       const code = input.value;
-      if (code.length !== 4) {
-        alert('Please enter a 4-digit code');
+      const errorElement = document.getElementById('codeError');
+      
+      if (code.length !== 3) {
+        errorElement.style.display = 'block';
+        errorElement.textContent = '❌ Error: Invalid Code Format';
         return;
       }
-      if (calibPhase !== 'done') {
-        alert('Please complete calibration first.');
+      
+      if (availableRooms.length === 0) {
+        errorElement.style.display = 'block';
+        errorElement.textContent = '❌ Error: No Rooms Selected';
         return;
       }
 
-      // place ghost from code
-      const dist = caseCodeToDistance(code);
-      const angDeg = caseCodeToAngle(code);
-      const angRad = angDeg * Math.PI / 180;
-      ghostX = Math.cos(angRad) * dist;
-      ghostY = Math.sin(angRad) * dist;
+      // Show loading message
+      errorElement.style.display = 'block';
+      errorElement.style.color = '#90EE90';
+      errorElement.textContent = '📡 Loading scenario data...';
 
-      // reset player
-      playerX = 0;
-      playerY = 0;
-      stepCount = 0;
+      // Load scenario (external JSON or embedded fallback)
+      currentScenario = await loadScenario(code);
+      
+      // ALSO try to load new ghost data format (e.g., 104.json)
+      currentGhostData = await loadGhostDataJSON(code);
+      
+      // Fallback: if ghost data fails, try to create simple timeline from scenario
+      if (!currentGhostData && currentScenario) {
+        console.log('Creating fallback ghost data from scenario');
+        currentGhostData = {
+          ghost_info: {
+            id: code,
+            location: currentScenario.room || "living_room"
+          },
+          timeline: [
+            { effect: "emf_spike", time: 5, emf_spike: 4.5, duration: 3 },
+            { effect: "emf_spike", time: 15, emf_spike: 5.2, duration: 4 }
+          ],
+          triggers: {}
+        };
+      }
+      
+      if (!currentScenario && !currentGhostData) {
+        // Show error for unknown codes
+        errorElement.style.color = '#ff6666';
+        errorElement.textContent = '❌ Error: Wrong Case Code';
+        return;
+      }
 
+      // Get ghost room from either format
+      let ghostRoom;
+      if (currentGhostData && currentGhostData.ghost_info) {
+        // Convert dining_room -> Dining Room for room matching
+        const rawRoom = currentGhostData.ghost_info.location;
+        ghostRoom = rawRoom.split('_').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+        
+        // Handle common room name mappings
+        if (ghostRoom === 'Dining Room') ghostRoom = 'Dinning Room'; // Match typo in room list
+        
+        console.log(`Ghost location: ${rawRoom} -> ${ghostRoom}`);
+      } else if (currentScenario) {
+        ghostRoom = currentScenario.GHOST_INFO ? currentScenario.GHOST_INFO.location : currentScenario.room;
+      }
+      
+      // Check if ghost room is available in selected rooms
+      if (!availableRooms.includes(ghostRoom)) {
+        errorElement.style.color = '#ff6666';
+        errorElement.textContent = '❌ Error: Wrong Case Code';
+        return;
+      }
+
+      // Initialize ghost position
+      currentGhostRoom = ghostRoom;
+
+      // Hide error and proceed
+      errorElement.style.display = 'none';
+      
       gameCode = code;
       investigationActive = true;
       startTime = Date.now();
-
-      document.getElementById('caseCode').textContent = code;
+      
+      // Start room timer for initial room
+      startRoomTimer();
+      
+      // Start NEW timeline system instead of old ghost activity
+      startTimelineSystem();
+      
       showScreen('toolScreen');
+      createRoomNavigation();
       startTimer();
       updateDebug();
     }
@@ -494,26 +1517,39 @@
       }, 1000);
     }
 
-    function checkGhostZone() {
-      const dx = playerX - ghostX;
-      const dy = playerY - ghostY;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      const inZone = dist <= 1.0;
-      document.getElementById('dbgInZone').textContent = inZone ? 'YES' : 'NO';
-      return inZone;
-    }
-
     function openTool(name) {
       if (name === 'emf') {
         showScreen('emfScreen');
+        createRoomNavigation();
       }
     }
 
     function endInvestigation() {
       if (!confirm('End investigation?')) return;
+      
       investigationActive = false;
       gameCode = '';
-      playerX = 0; playerY = 0; stepCount = 0;
+      currentScenario = null;
+      roomReadyForReadings = false;
+      evidenceActive = false;
+      currentGhostRoom = null;
+      
+      // Clear ghost data system
+      currentGhostData = null;
+      ghostTimeline = [];
+      timelinePosition = 0;
+      gameStartTime = 0;
+      ghostEventQueue = [];
+      
+      // Clear all timers
+      if (roomTimerInterval) clearInterval(roomTimerInterval);
+      if (evidenceTimer) clearTimeout(evidenceTimer);
+      if (timelineCheckInterval) clearInterval(timelineCheckInterval);
+      if (eventProcessingInterval) clearInterval(eventProcessingInterval);
+      
+      // Stop old ghost activity system
+      stopGhostActivity();
+      
       stopEMFReadings();
       showScreen('homeScreen');
       updateDebug();
@@ -524,68 +1560,152 @@
       showScreen('toolScreen');
     }
 
-    // ===== EMF =====
-    function createDial() {
-      const dial = document.querySelector('.dial-numbers');
-      const marks = document.querySelector('.scale-marks');
-      if (!dial || !marks) return;
-      for (let i=0;i<=10;i++) {
-        const num = document.createElement('div');
-        num.className = 'dial-number';
-        num.textContent = i;
-        const angle = 180 + (i * 18);
-        const radius = 130;
-        const rad = angle * Math.PI / 180;
-        const x = Math.cos(rad) * radius;
-        const y = Math.sin(rad) * radius;
-        num.style.left = `calc(50% + ${x}px - 12px)`;
-        num.style.top = `calc(50% + ${y}px - 12px)`;
-        dial.appendChild(num);
-      }
-      for (let i=0;i<=10;i++) {
-        const mark = document.createElement('div');
-        mark.className = 'scale-mark';
-        const mathAngle = 180 + (i*18);
-        const cssAngle = mathAngle - 270;
-        mark.style.transform = `rotate(${cssAngle}deg)`;
-        marks.appendChild(mark);
-      }
-    }
-
+    // ===== EMF - ENHANCED WITH BETTER CALIBRATION =====
     function updateEMFDisplay(val) {
       document.querySelector('.emf-value').textContent = val.toFixed(2);
       const needle = document.querySelector('.needle');
       if (needle) {
-        const angle = -90 + (val * 18);
-        needle.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+        // Improved dial calibration using configurable angles
+        // Map 0–6 EMF value to emfAngleMin–emfAngleMax
+        const fraction = Math.max(0, Math.min(1, val / 6)); // Clamp 0-1
+        const angle = emfAngleMin + (emfAngleMax - emfAngleMin) * fraction;
+        
+        needle.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+      }
+      
+      // Handle beeping and spike detection
+      handleEMFEffects(val);
+    }
+
+    function handleEMFEffects(val) {
+      const spikeIndicator = document.getElementById('spikeIndicator');
+      const spikeThreshold = 0.5; // How much change needed to trigger spike
+      
+      // Detect spikes
+      const change = Math.abs(val - lastEMFValue);
+      if (change > spikeThreshold && val > 2.0) {
+        triggerSpike();
+      }
+      
+      // Handle sustained high readings
+      if (val >= 4.0) {
+        if (!spikeIndicator.classList.contains('sustained')) {
+          spikeIndicator.classList.remove('flash');
+          spikeIndicator.classList.add('sustained');
+        }
+        handleBeeping(val);
+      } else {
+        spikeIndicator.classList.remove('sustained');
+        stopBeeping();
+      }
+      
+      lastEMFValue = val;
+    }
+
+    function triggerSpike() {
+      const spikeIndicator = document.getElementById('spikeIndicator');
+      spikeIndicator.classList.remove('sustained');
+      spikeIndicator.classList.add('flash');
+      
+      // Remove flash class after animation
+      setTimeout(() => {
+        spikeIndicator.classList.remove('flash');
+      }, 300);
+    }
+
+    function handleBeeping(emfValue) {
+      if (!devicePowered) return;
+      
+      // Initialize audio context on first use
+      if (!audioContext) {
+        try {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+          console.log('Audio not supported');
+          return;
+        }
+      }
+      
+      // Calculate beep interval based on EMF value (4.0 = 1000ms, 5.5+ = 100ms)
+      const minInterval = 100; // Fastest beep (almost continuous)
+      const maxInterval = 1000; // Slowest beep at EMF 4.0
+      const emfRange = Math.max(0, Math.min(1.5, emfValue - 4.0)); // 0 to 1.5 range
+      const intervalRange = maxInterval - minInterval;
+      const currentInterval = maxInterval - (emfRange / 1.5) * intervalRange;
+      
+      // Clear existing beep interval
+      if (beepInterval) {
+        clearInterval(beepInterval);
+      }
+      
+      // Start new beep interval
+      beepInterval = setInterval(() => {
+        playBeep();
+      }, currentInterval);
+      
+      // Play immediate beep
+      playBeep();
+    }
+
+    function playBeep() {
+      if (!audioContext || audioContext.state === 'suspended') return;
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // 800 Hz beep
+      oscillator.type = 'square';
+      
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
+      
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    }
+
+    function stopBeeping() {
+      if (beepInterval) {
+        clearInterval(beepInterval);
+        beepInterval = null;
       }
     }
 
     function generateEMFReading() {
       if (!devicePowered) return;
-      let target;
-      if (checkGhostZone()) {
-        target = 4.8 + Math.random() * 0.4;
-        document.getElementById('anomalyLed').style.opacity = '1';
-      } else {
-        target = 0.5 + (Math.random()-0.5)*0.3;
-        document.getElementById('anomalyLed').style.opacity = '0.3';
-      }
+      
+      // Simple baseline fluctuation between 0.1 and 0.6
+      let target = 0.1 + (Math.random() * 0.5); // 0.1 to 0.6
+      
+      // Smooth transition
       currentEMF += (target - currentEMF) * 0.1;
+      currentEMF = Math.max(0, Math.min(6, currentEMF));
       updateEMFDisplay(currentEMF);
     }
 
     function startEMFReadings() {
       if (emfAnimationInterval) clearInterval(emfAnimationInterval);
-      emfAnimationInterval = setInterval(generateEMFReading, 200);
+      emfAnimationInterval = setInterval(generateEMFReading, 300);
     }
 
     function stopEMFReadings() {
       if (emfAnimationInterval) clearInterval(emfAnimationInterval);
       emfAnimationInterval = null;
       currentEMF = 0.0;
+      lastEMFValue = 0.0;
       updateEMFDisplay(currentEMF);
-      document.getElementById('anomalyLed').style.opacity = '0.3';
+      stopBeeping();
+      
+      // Reset spike indicator
+      const spikeIndicator = document.getElementById('spikeIndicator');
+      if (spikeIndicator) {
+        spikeIndicator.classList.remove('flash', 'sustained');
+      }
+      
+      document.getElementById('anomalyLed').classList.remove('on');
     }
 
     function togglePower() {
@@ -593,31 +1713,75 @@
         alert('Start an investigation first');
         return;
       }
+      
       devicePowered = !devicePowered;
       const powerLed = document.getElementById('powerLed');
       const calibLed = document.getElementById('calibLed');
+      
       if (devicePowered) {
-        powerLed.style.opacity = '1';
-        calibLed.style.opacity = '1';
+        powerLed.classList.add('on');
+        calibLed.classList.add('on'); // Already green, just ensure it's visible
         startEMFReadings();
       } else {
-        powerLed.style.opacity = '0.3';
-        calibLed.style.opacity = '0.3';
+        powerLed.classList.remove('on');
+        calibLed.classList.remove('on'); // Keep it green but dimmer
         stopEMFReadings();
       }
     }
 
+    // ===== EMF CALIBRATION FUNCTIONS (For Testing) =====
+    function updateDialCalibration() {
+      emfAngleMin = parseInt(document.getElementById('angleMin').value);
+      emfAngleMax = parseInt(document.getElementById('angleMax').value);
+      
+      // Update current reading to reflect new calibration
+      if (devicePowered) {
+        updateEMFDisplay(currentEMF);
+      }
+    }
+
+    function testEMFReading() {
+      if (!devicePowered) return;
+      const testValue = parseFloat(document.getElementById('testEMF').value);
+      currentEMF = testValue;
+      updateEMFDisplay(currentEMF);
+    }
+
+    // Enable calibration mode (uncomment to enable testing controls)
+    function enableCalibrationMode() {
+      document.getElementById('emfCalibration').style.display = 'block';
+    }
+
     // ===== INIT =====
     document.addEventListener('DOMContentLoaded', function(){
-      createDial();
-      // code input numeric
+      // Code input - numeric only
       document.getElementById('gameCodeInput').addEventListener('keypress', function(e){
         if (e.key === 'Enter') startInvestigation();
         if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Enter') {
           e.preventDefault();
         }
       });
+      
+      // Initialize audio context on first user interaction
+      document.addEventListener('click', function initAudio() {
+        if (!audioContext) {
+          try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') {
+              audioContext.resume();
+            }
+          } catch (e) {
+            console.log('Audio not supported');
+          }
+        }
+        // Remove listener after first click
+        document.removeEventListener('click', initAudio);
+      });
+      
       updateDebug();
+      
+      // Uncomment this line to enable EMF calibration controls for testing:
+      // enableCalibrationMode();
     });
   </script>
 </body>
