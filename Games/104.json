@@ -10,6 +10,8 @@
     "evidence": ["emf_level_5", "spirit_box", "ghost_orbs"]
   },
   "timeline": new Sequence()
+    .effect("ghost_orbs")
+      .time(0.5),
     .effect("emf_spike")
       .time(1)
       .emf_spike(6)
@@ -36,8 +38,7 @@
       .duration(6)
       .audio("angry_voice.mp3")
     /* show orbs once on the timeline too */
-    .effect("ghost_orbs")
-      .time(5),
+    
   "triggers": {
 
   }
