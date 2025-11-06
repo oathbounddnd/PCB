@@ -1,4 +1,3 @@
-// Ghost 104 - Male Spirit - Dining Room
 {
   "ghost_info": {
     "id": "104",
@@ -7,39 +6,52 @@
     "class": 3,
     "location": "dinning_room",
     "mobility": "stationary",
-    "evidence": ["emf_level_5", "spirit_box", "ghost_orbs"]
+    "evidence": [
+      "emf_level_5",
+      "spirit_box",
+      "ghost_orbs"
+    ]
   },
-  "timeline": new Sequence()
-    .effect("ghost_orbs")
-      .time(0.5),
-    .effect("emf_spike")
-      .time(1)
-      .emf_spike(6)
-      .duration(10)
-      .audio("Poltergeist01.ogg")
-    .effect("emf_spike")
-      .time(7)
-      .emf_spike(5.6)
-      .duration(4)
-      .audio("chair_scrape.mp3")
-    .effect("emf_spike")
-      .time(12)
-      .emf_spike(5.9)
-      .duration(5)
-      .audio("door_slam.mp3")
-    .effect("emf_spike")
-      .time(18)
-      .emf_spike(5.3)
-      .duration(4)
-      .audio("heavy_breathing.mp3")
-    .effect("emf_spike")
-      .time(24)
-      .emf_spike(5.8)
-      .duration(6)
-      .audio("angry_voice.mp3")
-    /* show orbs once on the timeline too */
-    
-  "triggers": {
-
-  }
+  "timeline": [
+    {
+      "effect": "ghost_orbs",
+      "time": 0.5
+    },
+    {
+      "effect": "emf_spike",
+      "time": 1,
+      "emf_spike": 6,
+      "duration": 10,
+      "audio": "Poltergeist01.ogg"
+    },
+    {
+      "effect": "emf_spike",
+      "time": 7,
+      "emf_spike": 5.6,
+      "duration": 4,
+      "audio": "chair_scrape.mp3"
+    },
+    {
+      "effect": "emf_spike",
+      "time": 12,
+      "emf_spike": 5.9,
+      "duration": 5,
+      "audio": "door_slam.mp3"
+    },
+    {
+      "effect": "emf_spike",
+      "time": 18,
+      "emf_spike": 5.3,
+      "duration": 4,
+      "audio": "heavy_breathing.mp3"
+    },
+    {
+      "effect": "emf_spike",
+      "time": 24,
+      "emf_spike": 5.8,
+      "duration": 6,
+      "audio": "angry_voice.mp3"
+    }
+  ],
+  "triggers": {}
 }
