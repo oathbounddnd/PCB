@@ -707,31 +707,62 @@ const onSameFloor = verticalDistance <= 1;
         }
 
         function startIndoorTracking() {
-            // Compass (device orientation)
-            if (window.DeviceOrientationEvent) {
-                window.addEventListener('deviceorientation', function (event) {
-                    if (typeof event.alpha === 'number') {
-                        // 0–360
-                        playerHeading = event.alpha;
-                        isInGhostZone();
-                    }
-                }, true);
-            }
+            // try absolute orientation first (better on some Androids)
+function handleOrientation(event) {
+    let heading = null;
+
+    // iOS-style
+    if (typeof event.webkitCompassHeading === 'number') {
+        heading = event.webkitCompassHeading; // already 0–360
+    } else if (event.absolute && typeof event.alpha === 'number') {
+        // absolute alpha, often 0 = north
+        heading = event.alpha;
+    } else if (typeof event.alpha === 'number') {
+        // fallback: convert alpha to compass-ish
+        // many browsers give alpha 0 facing east, so flip it
+        heading = 360 - event.alpha;
+    }
+
+    if (heading !== null) {
+        // normalise
+        heading = (heading + 360) % 360;
+        playerHeading = heading;
+        // update zone + debug
+        isInGhostZone();
+    }
+}
+
+if (window.DeviceOrientationEvent) {
+    // some browsers fire this
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+    // and we also listen to the normal one as backup
+    window.addEventListener('deviceorientation', handleOrientation, true);
+}
+
 
             // Step detection (simple) using accelerometer
             if (window.DeviceMotionEvent) {
-                window.addEventListener('devicemotion', function (event) {
-                    const acc = event.accelerationIncludingGravity;
-                    if (!acc) return;
+    window.addEventListener('devicemotion', function (event) {
+        // prefer acceleration WITHOUT gravity if available
+        const acc = event.acceleration && (event.acceleration.x !== null)
+            ? event.acceleration
+            : event.accelerationIncludingGravity;
 
-                    const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-                    const now = Date.now();
-                    if (magnitude > 15 && (now - lastStepTime) > 400) {
-                        performStep();
-                        lastStepTime = now;
-                    }
-                });
-            }
+        if (!acc) return;
+
+        // overall movement strength
+        const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+        const now = Date.now();
+
+        // more sensitive: 7.5 instead of 11, and 250ms between steps
+        if (magnitude > 7.5 && (now - lastStepTime) > 250) {
+            console.log('Step detected (magnitude=' + magnitude.toFixed(2) + ')');
+            performStep();
+            lastStepTime = now;
+        }
+    });
+}
+
 
             // initial
             isInGhostZone();
