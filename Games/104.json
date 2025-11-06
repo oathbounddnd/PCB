@@ -11,7 +11,7 @@
   },
   "timeline": new Sequence()
     .effect("emf_spike")
-    .time(0.5)
+    .time(1)
     .emf_spike(6)
     .duration(10)
     .audio("PoltergeistMale01.ogg")
