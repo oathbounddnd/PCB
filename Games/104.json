@@ -5,7 +5,7 @@
     "name": "male",
     "type": "spirit",
     "class": 3,
-    "location": "dining_room",
+    "location": "dinning_room",
     "mobility": "stationary",
     "evidence": ["emf_level_5", "spirit_box", "ghost_orbs"]
   },
