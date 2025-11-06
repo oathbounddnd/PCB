@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>PCB Internal Mail</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+
+  <!-- ====== EDIT YOUR SCENARIOS HERE (top) ====== -->
+  <script>
+    // Add more scenarios here later if you want.
+    window.PCB_SCENARIOS = [
+      {
+        code: '1000',          // folder: PCB/Letters/1000/
+        followups: 2,          // e.g. 1.png, 2.png
+        classification: {      // correct answer
+          class: 'II',
+          type: 'Spirit',
+          sentience: '2',
+          aggression: '2',
+          mobility: '1'
+        }
+      }
+    ];
+  </script>
+  <!-- ============================================ -->
+
+  <style>
+    :root {
+      --bg: #d1b992;
+      --paper: #efe4c5;
+      --ink: #1a1109;
+      --muted: #6b5a45;
+      --accent: #b07a3f;
+      --header-bg: #2e2418;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      font-family: "Georgia", "Times New Roman", serif;
+      color: var(--ink);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--header-bg);
+      color: #f1e6d1;
+      border-bottom: 2px solid #b48a53;
+      padding: 0.9rem 1.3rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+    .head-titles h1 {
+      font-size: 1rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin: 0;
+      color: #f7e9ce;
+    }
+    .head-titles small {
+      display: block;
+      font-size: 0.62rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #d1b98f;
+    }
+    .app {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+    .inbox {
+      width: 280px;
+      background: #e0cda7;
+      border-right: 2px solid rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      box-shadow: inset -4px 0 8px rgba(0,0,0,0.08);
+    }
+    .inbox-title {
+      padding: .5rem .8rem;
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .2em;
+      color: var(--muted);
+      background: rgba(0,0,0,0.05);
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+    .list { flex: 1; overflow-y: auto; }
+    .msg {
+      display: flex;
+      gap: .6rem;
+      padding: .65rem .8rem;
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+      cursor: pointer;
+      align-items: center;
+    }
+    .msg:hover { background: rgba(255,255,255,0.25); }
+    .msg.active { background: rgba(255,255,255,0.4); }
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(0,0,0,0.25);
+      border-radius: 999px;
+      background: #f8eac8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .65rem;
+      font-weight: bold;
+    }
+    .info { flex: 1; min-width: 0; }
+    .from { font-size: .78rem; font-weight: bold; }
+    .subject {
+      font-size: .63rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .time {
+      font-size: .58rem;
+      color: var(--muted);
+    }
+    .unread-exclaim {
+      color: #e84f3b;
+      font-weight: bold;
+      font-size: 0.9rem;
+      animation: glow 1.5s ease-in-out infinite;
+    }
+    @keyframes glow {
+      0%,100% { text-shadow: 0 0 4px rgba(232,79,59,0.7); }
+      50% { text-shadow: 0 0 10px rgba(232,79,59,1); }
+    }
+    .apply-box {
+      padding: .7rem .8rem .8rem;
+      border-top: 1px solid rgba(0,0,0,0.12);
+      background: rgba(0,0,0,0.03);
+    }
+    .apply-btn {
+      width: 100%;
+      background: #b07a3f;
+      border: none;
+      color: #fcefdc;
+      padding: .5rem;
+      font-weight: bold;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .apply-btn:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+    .apply-note {
+      font-size: .6rem;
+      color: var(--muted);
+      margin-top: .35rem;
+    }
+    .viewer {
+      flex: 1;
+      background: var(--paper);
+      padding: 1rem 1.2rem;
+      overflow-y: auto;
+    }
+    .viewer-frame {
+      background: #fffdf4;
+      border: 1px solid rgba(0,0,0,0.12);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+      max-width: 900px;
+      margin: 0 auto;
+      min-height: 80vh;
+      padding: 1rem;
+      position: relative;
+    }
+    .viewer img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+    .placeholder {
+      font-size: .85rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 3rem;
+    }
+    .reply-panel {
+      margin-top: 1rem;
+      background: rgba(208,196,162,0.45);
+      border: 1px solid rgba(0,0,0,0.06);
+      padding: .75rem;
+      border-radius: 6px;
+    }
+    .reply-panel h3 {
+      margin: 0 0 .5rem;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+    .reply-panel p {
+      font-size: .7rem;
+      margin-bottom: .4rem;
+    }
+    .reply-panel label {
+      display: block;
+      font-size: .65rem;
+      margin-top: .4rem;
+    }
+    .reply-panel select {
+      width: 100%;
+      padding: .3rem;
+      margin-top: .2rem;
+      background: #fff9ea;
+      border: 1px solid rgba(0,0,0,0.08);
+      font-family: inherit;
+    }
+    .reply-send {
+      margin-top: .6rem;
+      background: #2e2418;
+      color: #f9efdd;
+      border: none;
+      padding: .35rem .7rem;
+      text-transform: uppercase;
+      font-size: .7rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    /* sending animation */
+    .sending-indicator {
+      margin-top: .7rem;
+      background: rgba(46,36,24,0.85);
+      color: #f9efdd;
+      padding: .4rem .6rem;
+      border-radius: 4px;
+      font-size: .65rem;
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      animation: fadepulse 1.2s ease-in-out infinite;
+    }
+    .sending-dot {
+      width: 6px;
+      height: 6px;
+      background: #f9efdd;
+      border-radius: 999px;
+      animation: bounce 0.9s ease-in-out infinite;
+    }
+    @keyframes fadepulse {
+      0%,100% { opacity: 1; }
+      50% { opacity: .6; }
+    }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="head-titles">
+    <h1>PARANORMAL CONTAINMENT BUREAU</h1>
+    <small>Private Investigation & Containment Service</small>
+  </div>
+</header>
+
+<div class="app">
+  <aside class="inbox">
+    <div class="inbox-title">Inbox</div>
+    <div class="list" id="inboxList"></div>
+    <div class="apply-box">
+      <button id="applyBtn" class="apply-btn">Apply for job</button>
+      <div class="apply-note" id="applyNote">Requests will be processed by Headquarters.</div>
+    </div>
+  </aside>
+  <main class="viewer">
+    <div class="viewer-frame" id="viewerFrame">
+      <p class="placeholder">Select a message from Headquarters to view the attached letter.</p>
+    </div>
+  </main>
+</div>
+
+<audio id="pingSound">
+  <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" type="audio/wav">
+</audio>
+
+<script>
+const SCENARIOS = window.PCB_SCENARIOS;
+const inboxEl = document.getElementById('inboxList');
+const viewer = document.getElementById('viewerFrame');
+const ping = document.getElementById('pingSound');
+const applyBtn = document.getElementById('applyBtn');
+const applyNote = document.getElementById('applyNote');
+
+// starter message
+const messages = [
+  {
+    id: 'msg-0',
+    from: 'Headquarters',
+    subject: 'Welcome to the PCB Internal Mail System',
+    time: new Date().toLocaleString(),
+    src: 'Letters/PCB Recruit Letter.png',
+    unread: true,
+    scenarioCode: null,
+    isReportRequest: false,
+    hasText: false
+  }
+];
+
+function renderInbox() {
+  inboxEl.innerHTML = '';
+  messages.forEach(msg => {
+    const row = document.createElement('div');
+    row.className = 'msg' + (msg.active ? ' active' : '');
+    row.dataset.id = msg.id;
+
+    const av = document.createElement('div');
+    av.className = 'avatar';
+    av.textContent = 'HQ';
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    info.innerHTML = `<div class="from">${msg.from}</div><div class="subject">${msg.subject}</div>`;
+
+    const right = document.createElement('div');
+    right.style.display = 'flex';
+    right.style.flexDirection = 'column';
+    right.style.alignItems = 'flex-end';
+    right.style.gap = '4px';
+
+    const time = document.createElement('div');
+    time.className = 'time';
+    time.textContent = msg.time;
+    right.appendChild(time);
+
+    if (msg.unread) {
+      const ex = document.createElement('div');
+      ex.className = 'unread-exclaim';
+      ex.textContent = '!';
+      right.appendChild(ex);
+    }
+
+    row.append(av, info, right);
+    row.addEventListener('click', () => openMessage(msg.id));
+    inboxEl.appendChild(row);
+  });
+}
+
+function openMessage(id) {
+  messages.forEach(m => m.active = false);
+  const msg = messages.find(m => m.id === id);
+  if (!msg) return;
+  msg.active = true;
+  msg.unread = false;
+
+  viewer.innerHTML = '';
+
+  if (msg.hasText) {
+    const p = document.createElement('p');
+    p.style.fontSize = '.85rem';
+    p.style.lineHeight = '1.5';
+    p.innerHTML = msg.textBody.replace(/\n/g, '<br>');
+    viewer.appendChild(p);
+  } else {
+    const img = document.createElement('img');
+    img.src = msg.src;
+    img.alt = msg.subject;
+    img.onerror = function() {
+      viewer.innerHTML = `<p style="color:#8b3d2c;font-size:.85rem;">
+        Could not load the letter image from <code>${msg.src}</code>.<br>
+        Ensure file exists at <strong>PCB/${msg.src}</strong>.
+      </p>`;
+    };
+    viewer.appendChild(img);
+  }
+
+  if (msg.isReportRequest && msg.scenarioCode) {
+    const panel = document.createElement('div');
+    panel.className = 'reply-panel';
+    panel.innerHTML = `
+      <h3>Submit Classification Report</h3>
+      <p>Domestic site, active manifestation. Report your best determination below.</p>
+      <label>Class</label>
+      <select id="replyClass">
+        <option value="I">Class I – Benign</option>
+        <option value="II" selected>Class II – Disruptive</option>
+        <option value="III">Class III – Hostile</option>
+        <option value="IV">Class IV – Critical</option>
+        <option value="V">Class V – Apocalyptic</option>
+      </select>
+      <label>Type</label>
+      <select id="replyType">
+        <option value="Spirit" selected>Spirit</option>
+        <option value="Wraith">Wraith</option>
+        <option value="Demon">Demon</option>
+        <option value="Shade">Shade</option>
+        <option value="Poltergeist">Poltergeist</option>
+        <option value="Spectre">Spectre</option>
+      </select>
+      <label>Sentience (0–5)</label>
+      <select id="replySentience">
+        <option value="0">0</option><option value="1">1</option><option value="2" selected>2</option>
+        <option value="3">3</option><option value="4">4</option><option value="5">5</option>
+      </select>
+      <label>Aggression (0–9)</label>
+      <select id="replyAggression">
+        <option value="0">0</option><option value="1">1</option><option value="2" selected>2</option>
+        <option value="3">3</option><option value="4">4</option><option value="5">5</option>
+        <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option>
+      </select>
+      <label>Mobility (0–5)</label>
+      <select id="replyMobility">
+        <option value="0">0</option><option value="1" selected>1</option><option value="2">2</option>
+        <option value="3">3</option><option value="4">4</option><option value="5">5</option>
+      </select>
+      <button class="reply-send" id="replySendBtn">Send to HQ</button>
+    `;
+    viewer.appendChild(panel);
+
+    panel.querySelector('#replySendBtn').addEventListener('click', () => {
+      const out = {
+        class: panel.querySelector('#replyClass').value,
+        type: panel.querySelector('#replyType').value,
+        sentience: panel.querySelector('#replySentience').value,
+        aggression: panel.querySelector('#replyAggression').value,
+        mobility: panel.querySelector('#replyMobility').value
+      };
+      // visual sending state
+      panel.querySelector('#replySendBtn').disabled = true;
+      panel.querySelector('#replySendBtn').textContent = 'Transmitting to HQ...';
+      showSendingAnimation();
+      sendReplyToHQ(msg.scenarioCode, out);
+    });
+  }
+
+  renderInbox();
+}
+
+function addMessage({subject, src, scenarioCode = null, isReportRequest = false, hasText = false, textBody = ''}) {
+  const now = new Date();
+  const msg = {
+    id: 'msg-' + (messages.length + 1),
+    from: 'Headquarters',
+    subject: subject,
+    time: now.toLocaleString(),
+    src: src,
+    unread: true,
+    scenarioCode: scenarioCode,
+    isReportRequest: isReportRequest,
+    hasText: hasText,
+    textBody: textBody
+  };
+  messages.unshift(msg);
+  renderInbox();
+  ping.play().catch(()=>{});
+}
+
+function scheduleFollowups(scenario) {
+  const total = scenario.followups || 0;
+  for (let i = 1; i <= total; i++) {
+    const delay = 15000 + Math.random() * 15000; // 15–30s
+    setTimeout(() => {
+      addMessage({
+        subject: `Case ${scenario.code} – Attachment ${i}`,
+        src: `Letters/${scenario.code}/${i}.png`,
+        scenarioCode: scenario.code
+      });
+    }, delay * i);
+  }
+}
+
+function showSendingAnimation() {
+  const bar = document.createElement('div');
+  bar.className = 'sending-indicator';
+  bar.id = 'sendingIndicator';
+  bar.innerHTML = `<span>Sending to Headquarters…</span><span class="sending-dot"></span>`;
+  viewer.appendChild(bar);
+}
+
+function hideSendingAnimation() {
+  const bar = document.getElementById('sendingIndicator');
+  if (bar) bar.remove();
+}
+
+function sendReplyToHQ(code, playerAnswer) {
+  const scenario = SCENARIOS.find(s => s.code === code);
+  if (!scenario) return;
+  setTimeout(() => {
+    const correct = scenario.classification;
+    const isCorrect =
+      correct.class === playerAnswer.class &&
+      correct.type === playerAnswer.type &&
+      correct.sentience === playerAnswer.sentience &&
+      correct.aggression === playerAnswer.aggression &&
+      correct.mobility === playerAnswer.mobility;
+
+    hideSendingAnimation();
+
+    if (isCorrect) {
+      addMessage({
+        subject: `Case ${code} – Classification Confirmed`,
+        src: '',
+        hasText: true,
+        textBody:
+          `HQ REPORT: Your domestic classification for Case ${code} has been received and upheld.<br><br>` +
+          `A secondary containment team (SCT-2) entered post-operation and reproduced your readings within acceptable variance. ` +
+          `Entity is to remain logged at <strong>Class ${correct.class}</strong> and designated <strong>${correct.type}</strong> with ` +
+          `supplementary profile S${correct.sentience}/A${correct.aggression}/M${correct.mobility}.<br><br>` +
+          `Your report will be used as the reference document for future site visits. Maintain blackout on civilian channels.`
+      });
+    } else {
+      addMessage({
+        subject: `Case ${code} – Classification Adjusted`,
+        src: '',
+        hasText: true,
+        textBody:
+          `HQ REPORT: Your submission for Case ${code} contained one or more discrepancies when compared with follow-up field readings.<br><br>` +
+          `<strong>HQ Determination:</strong><br>` +
+          `Class: ${correct.class}<br>` +
+          `Type: ${correct.type}<br>` +
+          `Sentience: ${correct.sentience}<br>` +
+          `Aggression: ${correct.aggression}<br>` +
+          `Mobility: ${correct.mobility}<br><br>` +
+          `A verification team re-entered the premises after your assessment and re-profiled the entity. ` +
+          `Update your local records to match HQ Determination and do not circulate your preliminary figures.`
+      });
+    }
+  }, 2500);
+}
+
+applyBtn.addEventListener('click', () => {
+  applyBtn.disabled = true;
+  applyNote.textContent = 'Submitting request to Headquarters...';
+  setTimeout(() => {
+    const scenario = SCENARIOS[0]; // only one right now
+
+    addMessage({
+      subject: `Case ${scenario.code} – Task`,
+      src: `Letters/${scenario.code}/Task.png`,
+      scenarioCode: scenario.code
+    });
+
+    addMessage({
+      subject: `Case ${scenario.code} – Submit Domestic Classification`,
+      src: '',
+      scenarioCode: scenario.code,
+      isReportRequest: true,
+      hasText: true,
+      textBody: `Headquarters requires immediate classification for Case ${scenario.code}.<br><br>` +
+                `This is a domestic manifestation. Use the form below to submit: <em>Class, Entity Type, Sentience, Aggression, Mobility</em>.<br>` +
+                `Do not contact occupants. Await confirmation from HQ.`
+    });
+
+    scheduleFollowups(scenario);
+
+    applyNote.textContent = `Case ${scenario.code} assigned. Await further instructions.`;
+    setTimeout(() => {
+      applyBtn.disabled = false;
+      applyNote.textContent = 'Requests will be processed by Headquarters.';
+    }, 8000);
+  }, 2500);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderInbox();
+  ping.play().catch(()=>{});
+});
+</script>
+</body>
+</html>

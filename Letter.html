@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PCB Letter Template</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+      font-family: "Georgia", "Times New Roman", serif;
+      background: #f0efe9;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .editor {
+      width: 30%;
+      background: #1f1f1f;
+      color: #fff;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+    .editor h2 {
+      margin-top: 0;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .editor label {
+      display: block;
+      margin: 0.75rem 0 0.35rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #cfcfcf;
+    }
+    .editor input {
+      width: 100%;
+      box-sizing: border-box;
+      border: none;
+      border-radius: 4px;
+      padding: 0.5rem;
+      font-family: inherit;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+    .toolbar {
+      margin: 0.5rem 0;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .toolbar button {
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 0.3rem 0.4rem;
+      cursor: pointer;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 3px;
+    }
+    .toolbar button:hover {
+      background: #555;
+    }
+    .rich-editor {
+      background: #fff;
+      color: #000;
+      min-height: 200px;
+      padding: 0.5rem;
+      border-radius: 4px;
+      overflow-y: auto;
+      font-size: 0.9rem;
+    }
+    .save-btn {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.6rem 0.5rem;
+      background: #29b37c;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .save-btn:hover {
+      background: #229968;
+    }
+    .letter-wrap {
+      width: 70%;
+      padding: 2rem 3rem;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .letter {
+      background: #f9f0da; /* paper-like */
+      background-image:
+        radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1px),
+        linear-gradient(transparent 0, rgba(0,0,0,0.02) 1px);
+      background-size: 180px 180px, 100% 22px;
+      background-blend-mode: multiply;
+      width: 100%;
+      max-width: 700px;
+      min-height: 90vh;
+      border: 1px solid rgba(0,0,0,0.1);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+      padding: 2.5rem 2.5rem 3.5rem;
+      box-sizing: border-box;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #222;
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .header img {
+      width: 180px;
+      max-width: 60%;
+      height: auto;
+      display: block;
+      margin: 0 auto 0.5rem auto;
+    }
+    .sub-line {
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-top: 0.3rem;
+    }
+    .addr {
+      margin-top: 0.6rem;
+      font-size: 0.75rem;
+      line-height: 1.3;
+    }
+    .date-line, .to-line {
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .subject-line {
+      font-weight: 700;
+      margin: 1.5rem 0 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.8rem;
+    }
+    .body-text {
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+    .footer {
+      margin-top: 2rem;
+      font-size: 0.7rem;
+      color: #555;
+      border-top: 1px solid rgba(0,0,0,0.15);
+      padding-top: 0.5rem;
+    }
+    @media(max-width: 900px) {
+      body {flex-direction: column;}
+      .editor, .letter-wrap {width: 100%;}
+      .rich-editor {min-height: 140px;}
+    }
+  </style>
+</head>
+<body>
+
+  <div class="editor">
+    <h2>PCB Letter Editor</h2>
+
+    <label for="logoUpload">Upload Letterhead Logo</label>
+    <input id="logoUpload" type="file" accept="image/*">
+
+    <label for="recipient">Recipient / Dept</label>
+    <input id="recipient" type="text" value="To: Newly Inducted Field Operatives">
+
+    <label for="subject">Subject</label>
+    <input id="subject" type="text" value="Operational Guidelines — PCB Entity Classification Framework (FRF-01)">
+
+    <label>Letter Body</label>
+    <div class="toolbar">
+      <button type="button" data-cmd="bold">B</button>
+      <button type="button" data-cmd="italic"><em>I</em></button>
+      <button type="button" data-cmd="underline"><u>U</u></button>
+      <button type="button" data-cmd="insertUnorderedList">• List</button>
+    </div>
+    <div id="richEditor" class="rich-editor" contenteditable="true">
+      Sir/Madam,<br><br>
+      In order to standardise field reports and facilitate coherent containment procedures, all personnel are to familiarise themselves with the official <strong>Paranormal Containment Bureau Entity Classification System</strong>, codename <strong>FRF-01</strong>.<br><br>
+      <strong>Entity Types:</strong><br>
+      Spirit (T-S): Residual human consciousness bound to a site or emotion.<br>
+      Wraith (T-W): Degraded spirit with malevolent intent.<br>
+      Demon (T-D): Non-human extra-planar entity. Critical threat.<br>
+      Shade (T-Sh): Psychic echo lacking sentience.<br>
+      Poltergeist (T-P): Disembodied kinetic energy.<br>
+      Spectre (T-Sp): Unstable or partial manifestation.<br><br>
+      <strong>Class Designations:</strong><br>
+      Class I – Benign<br>
+      Class II – Disruptive<br>
+      Class III – Hostile<br>
+      Class IV – Critical<br>
+      Class V – Apocalyptic / Extra-Planar Breach<br><br>
+      Yours faithfully,<br>
+      E. Harrow<br>
+      Director, Phenomenological Classification Division
+    </div>
+
+    <button class="save-btn" id="savePngBtn">Save Letter as PNG</button>
+  </div>
+
+  <div class="letter-wrap">
+    <div class="letter" id="letterArea">
+      <div class="header">
+        <img id="letterLogo" src="" alt="PCB Logo" style="display:none;">
+        <div class="sub-line">Private Investigation &amp; Containment Service</div>
+        <div class="addr">
+          The Old Telegraph House<br>
+          Blackcombe Lane, Upper Wychford, Cotswolds<br>
+          GL12 7AQ, United Kingdom<br>
+          Tel: +44 (0)1453 555 203
+        </div>
+      </div>
+
+      <div class="date-line" id="dateLine"></div>
+
+      <div class="to-line" id="toLine">To: Newly Inducted Field Operatives</div>
+
+      <div class="subject-line" id="subjectLine">Operational Guidelines — PCB Entity Classification Framework (FRF-01)</div>
+
+      <div class="body-text" id="bodyText">
+        <!-- will mirror from editor -->
+      </div>
+
+      <div class="footer">
+        This correspondence is the property of the Paranormal Containment Bureau (PCB) and may not be reproduced or disclosed without written permission.
+      </div>
+    </div>
+  </div>
+
+  <!-- html2canvas -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <script>
+    // date
+    const dateLine = document.getElementById('dateLine');
+    const today = new Date();
+    const opts = { day: 'numeric', month: 'long', year: 'numeric' };
+    dateLine.textContent = today.toLocaleDateString('en-GB', opts);
+
+    // inputs
+    const recipientInput = document.getElementById('recipient');
+    const subjectInput = document.getElementById('subject');
+    const richEditor = document.getElementById('richEditor');
+
+    const toLine = document.getElementById('toLine');
+    const subjectLine = document.getElementById('subjectLine');
+    const bodyText = document.getElementById('bodyText');
+
+    function syncLetter() {
+      toLine.textContent = recipientInput.value || '';
+      subjectLine.textContent = subjectInput.value || '';
+      bodyText.innerHTML = richEditor.innerHTML;
+    }
+
+    recipientInput.addEventListener('input', syncLetter);
+    subjectInput.addEventListener('input', syncLetter);
+    richEditor.addEventListener('input', syncLetter);
+
+    // toolbar
+    document.querySelectorAll('.toolbar button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.getAttribute('data-cmd');
+        document.execCommand(cmd, false, null);
+        richEditor.focus();
+        syncLetter();
+      });
+    });
+
+    // logo upload
+    const logoUpload = document.getElementById('logoUpload');
+    const letterLogo = document.getElementById('letterLogo');
+
+    logoUpload.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        letterLogo.src = e.target.result;
+        letterLogo.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // initial sync
+    syncLetter();
+
+    // save as PNG
+    const saveBtn = document.getElementById('savePngBtn');
+    const letterArea = document.getElementById('letterArea');
+
+    saveBtn.addEventListener('click', function () {
+      html2canvas(letterArea, {
+        scale: 2
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'pcb-letter.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }).catch(err => {
+        console.error(err);
+        alert('Could not export letter.');
+      });
+    });
+  </script>
+</body>
+</html>
