@@ -436,21 +436,6 @@
             max-width: 220px;
             z-index: 10;
         }
-
-        .mini-btn {
-            background: #2a2a2a;
-            border: 1px solid #555;
-            color: #c0c0c0;
-            padding: 4px 8px;
-            font-size: 10px;
-            border-radius: 4px;
-            margin-right: 4px;
-            margin-top: 4px;
-            cursor: pointer;
-        }
-        .mini-btn:active {
-            transform: translateY(1px);
-        }
     </style>
 </head>
 <body>
@@ -590,12 +575,14 @@
         let playerStartPos = null;
         let ghostLocation = null;
         let currentPosition = null;
-        let playerHeading = 0; // degrees (relative)
-        let headingBaseline = null; // first real reading
-        let useOrientation = false;
+
+        // heading = 0 at start (our fake north)
+        let playerHeading = 0;
+        let headingBaseline = null; // first orientation value
         let stepCount = 0;
         const STEP_LENGTH = 0.7;
         let lastStepTime = 0;
+        let lastMotionTimestamp = null; // for gyro integration
 
         // Generate ghost 2–4m away
         function generateGhostLocation(startX, startY, startAlt) {
@@ -674,57 +661,82 @@
             }
         }
 
-        // relative orientation: first reading = north
         function initOrientationListener() {
             if (!window.DeviceOrientationEvent) return;
 
             window.addEventListener('deviceorientation', function (event) {
-                if (typeof event.alpha !== 'number') return;
+                try {
+                    if (typeof event.alpha !== 'number') return;
 
-                let raw = event.alpha; // 0–360 but weird on some phones
+                    let raw = event.alpha;
 
-                if (headingBaseline === null) {
-                    headingBaseline = raw;
-                    playerHeading = 0;
-                    useOrientation = true;
+                    if (headingBaseline === null) {
+                        headingBaseline = raw;
+                        playerHeading = 0;
+                        isInGhostZone();
+                        return;
+                    }
+
+                    let delta = raw - headingBaseline;
+                    if (delta > 180) delta -= 360;
+                    if (delta < -180) delta += 360;
+
+                    // exaggerate small changes
+                    delta = delta * 2;
+                    playerHeading = (delta + 360) % 360;
                     isInGhostZone();
-                    return;
+                } catch (e) {
+                    console.warn('orientation err', e);
                 }
-
-                // difference from start
-                let delta = raw - headingBaseline;
-
-                // normalise to -180..180
-                if (delta > 180) delta -= 360;
-                if (delta < -180) delta += 360;
-
-                // exaggerate small device changes
-                delta = delta * 2;
-
-                playerHeading = (delta + 360) % 360;
-                isInGhostZone();
             }, true);
         }
 
         function startIndoorTracking() {
-            // orientation first
             initOrientationListener();
 
-            // step detection
             if (window.DeviceMotionEvent) {
                 window.addEventListener('devicemotion', function (event) {
                     const now = Date.now();
-                    const acc = event.acceleration && (event.acceleration.x !== null)
-                        ? event.acceleration
-                        : event.accelerationIncludingGravity;
 
-                    if (acc) {
-                        const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-                        // pretty sensitive
-                        if (magnitude > 3.8 && (now - lastStepTime) > 200) {
-                            performStep();
-                            lastStepTime = now;
+                    // gyro fallback (if orientation didn't fire, this will still rotate us)
+                    try {
+                        if (event.rotationRate && typeof event.rotationRate.alpha === 'number') {
+                            let dt = 0;
+                            if (lastMotionTimestamp !== null) {
+                                dt = (now - lastMotionTimestamp) / 1000;
+                            }
+                            lastMotionTimestamp = now;
+
+                            if (dt > 0) {
+                                // alpha is deg/sec around Z
+                                const yawSpeed = event.rotationRate.alpha;
+                                if (!isNaN(yawSpeed)) {
+                                    playerHeading = (playerHeading + yawSpeed * dt) % 360;
+                                    if (playerHeading < 0) playerHeading += 360;
+                                }
+                            }
+                        } else {
+                            lastMotionTimestamp = now;
                         }
+                    } catch (e) {
+                        // ignore
+                    }
+
+                    // step detection
+                    try {
+                        const acc = event.acceleration && (event.acceleration.x !== null)
+                            ? event.acceleration
+                            : event.accelerationIncludingGravity;
+
+                        if (acc) {
+                            const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+                            if (magnitude > 3.8 && (now - lastStepTime) > 200) {
+                                performStep();
+                                lastStepTime = now;
+                            }
+                        }
+                    } catch (e) {
+                        // ignore
                     }
 
                     isInGhostZone();
@@ -736,7 +748,8 @@
 
         function performStep(customLength) {
             const len = customLength || STEP_LENGTH;
-            const rad = (playerHeading - 90) * Math.PI / 180;
+            // heading 0 = move +X
+            const rad = playerHeading * Math.PI / 180;
 
             if (!currentPosition) {
                 currentPosition = { x: 0, y: 0, alt: 0, floor: 'ground floor' };
@@ -803,9 +816,9 @@
                 currentPosition = null;
                 playerHeading = 0;
                 headingBaseline = null;
-                useOrientation = false;
                 stepCount = 0;
                 lastStepTime = 0;
+                lastMotionTimestamp = null;
 
                 document.getElementById('gameCodeInput').value = '';
                 showScreen('homeScreen');
