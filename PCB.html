@@ -1,1007 +1,624 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PCB Investigation Kit</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCB Investigation Kit</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+    body {
+      background:
+        radial-gradient(circle at 30% 20%, rgba(64, 64, 64, 0.3), transparent 50%),
+        radial-gradient(circle at 70% 80%, rgba(96, 96, 96, 0.2), transparent 50%),
+        linear-gradient(135deg, #2a2a2a, #1a1a1a);
+      font-family:'Times New Roman', serif;
+      color:#c0c0c0;
+      height:100vh;
+      overflow:hidden;
+      position:relative;
+    }
+    .static-overlay {
+      position:absolute; top:0; left:0; width:100%; height:100%;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(128, 128, 128, 0.06) 1px, transparent 1px),
+        radial-gradient(circle at 80% 70%, rgba(160, 160, 160, 0.04) 1px, transparent 1px);
+      background-size:6px 6px, 8px 8px;
+      animation: staticNoise 0.2s infinite;
+      pointer-events:none;
+      z-index:1;
+    }
+    @keyframes staticNoise { 0%{opacity:.5;} 50%{opacity:.8;} 100%{opacity:.5;} }
 
-        body {
-            background:
-                radial-gradient(circle at 30% 20%, rgba(64, 64, 64, 0.3), transparent 50%),
-                radial-gradient(circle at 70% 80%, rgba(96, 96, 96, 0.2), transparent 50%),
-                linear-gradient(135deg, #2a2a2a, #1a1a1a);
-            font-family: 'Times New Roman', serif;
-            color: #c0c0c0;
-            height: 100vh;
-            overflow: hidden;
-            position: relative;
-        }
+    .screen { position:relative; z-index:2; height:100vh; padding:20px; display:none; }
+    .screen.active { display:flex; flex-direction:column; }
 
-        .static-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background:
-                radial-gradient(circle at 20% 30%, rgba(128, 128, 128, 0.06) 1px, transparent 1px),
-                radial-gradient(circle at 80% 70%, rgba(160, 160, 160, 0.04) 1px, transparent 1px);
-            background-size: 6px 6px, 8px 8px;
-            animation: staticNoise 0.2s infinite;
-            pointer-events: none;
-            z-index: 1;
-        }
+    .centered { justify-content:center; align-items:center; text-align:center; }
 
-        @keyframes staticNoise {
-            0% { opacity: 0.5; }
-            50% { opacity: 0.8; }
-            100% { opacity: 0.5; }
-        }
+    .btn {
+      padding: 12px 24px;
+      background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+      border: 2px solid #888;
+      color: #c0c0c0;
+      border-radius: 8px;
+      font-weight:bold;
+      cursor:pointer;
+      margin-top:12px;
+    }
+    .btn:active { transform:translateY(1px); }
 
-        .screen {
-            position: relative;
-            z-index: 2;
-            height: 100vh;
-            padding: 20px;
-            display: none;
-        }
+    .pcb-logo {
+      font-size: 28px;
+      font-weight: bold;
+      color: #a0a0a0;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.7), 0 0 15px #888888;
+      margin-bottom: 10px;
+      letter-spacing: 3px;
+    }
+    .home-subtitle {
+      font-size: 16px;
+      color: #888;
+      margin-bottom: 40px;
+      font-style: italic;
+    }
+    .game-code-input {
+      width:200px; height:60px; font-size:28px; text-align:center;
+      background:#1a1a1a; border:3px solid #666; border-radius:8px;
+      color:#c0c0c0; letter-spacing:8px; margin-bottom:30px;
+    }
 
-        .screen.active {
-            display: flex;
-            flex-direction: column;
-        }
+    .tool-screen { align-items:center; }
+    .header { text-align:center; margin-bottom:30px; width:100%; }
+    .timer-display { font-size:32px; color:#90EE90; text-shadow:0 0 10px #90EE90; margin-bottom:20px; }
+    .case-info { color:#888; margin-bottom:20px; }
+    .tools-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; max-width:400px; }
+    .tool-btn {
+      padding:30px 20px; background:linear-gradient(145deg, #383838, #2a2a2a);
+      border:2px solid #666; border-radius:12px; text-align:center; cursor:pointer;
+    }
+    .tool-btn.disabled { opacity:.4; cursor:not-allowed; }
+    .tool-icon { font-size:24px; margin-bottom:10px; }
+    .tool-name { font-size:16px; font-weight:bold; }
 
-        .home-screen {
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-        }
+    .emf-container { padding:20px; height:100vh; display:flex; flex-direction:column; position:relative; }
+    .back-btn {
+      position:absolute; top:20px; left:20px;
+      padding:6px 10px; font-size:12px;
+      background:linear-gradient(145deg, #3a3a3a, #2a2a2a);
+      border:1px solid #666; border-radius:4px; cursor:pointer;
+    }
+    .status-bar {
+      display:flex; justify-content:space-between; align-items:center;
+      background:linear-gradient(135deg, rgba(42,42,42,.9), rgba(26,26,26,.9));
+      border:2px solid #606060; padding:12px 18px; margin-bottom:20px; border-radius:8px;
+    }
+    .status-led { width:10px; height:10px; border-radius:50%; margin-right:8px; }
+    .status-led.red { background:#8b0000; opacity:.3; }
+    .status-led.green { background:#228b22; }
+    .power-button { cursor:pointer; padding:6px 10px; border:1px solid #888; border-radius:4px; }
+    .main-display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .emf-meter {
+      width:280px; height:280px; border:4px solid #888; border-radius:50%; position:relative; margin-bottom:30px;
+      background: radial-gradient(circle at 30% 30%, #383838, #2a2a2a), radial-gradient(circle at 70% 70%, #404040, #2a2a2a);
+    }
+    .meter-face { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:240px; height:240px; border-radius:50%; }
+    .dial-numbers, .scale-marks { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); }
+    .dial-number { position:absolute; width:24px; height:24px; display:flex; align-items:center; justify-content:center; color:#b8b8b8; font-weight:bold; }
+    .needle {
+      position:absolute; top:50%; left:50%; width:3px; height:100px;
+      background:#c0c0c0; transform-origin:bottom center;
+      transform:translate(-50%, -100%) rotate(-90deg);
+      transition:transform .3s ease;
+    }
+    .digital-reading {
+      background:rgba(42,42,42,.6); border:2px solid #606060; border-radius:8px; padding:15px; text-align:center;
+    }
+    .emf-value { font-size:48px; }
 
-        .pcb-logo {
-            font-size: 28px;
-            font-weight: bold;
-            color: #a0a0a0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.7), 0 0 15px #888888;
-            margin-bottom: 10px;
-            letter-spacing: 3px;
-        }
-
-        .home-subtitle {
-            font-size: 16px;
-            color: #888;
-            margin-bottom: 40px;
-            font-style: italic;
-        }
-
-        .game-code-input {
-            width: 200px;
-            height: 60px;
-            font-size: 28px;
-            text-align: center;
-            background: #1a1a1a;
-            border: 3px solid #666;
-            border-radius: 8px;
-            color: #c0c0c0;
-            font-family: 'Times New Roman', serif;
-            letter-spacing: 8px;
-            margin-bottom: 30px;
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
-        }
-
-        .game-code-input:focus {
-            outline: none;
-            border-color: #a0a0a0;
-            box-shadow:
-                inset 0 0 15px rgba(0,0,0,0.8),
-                0 0 15px rgba(160,160,160,0.3);
-        }
-
-        .btn {
-            padding: 15px 30px;
-            background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
-            border: 2px solid #888;
-            color: #c0c0c0;
-            font-family: 'Times New Roman', serif;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin: 10px;
-        }
-
-        .btn:active {
-            transform: translateY(2px);
-            background: linear-gradient(145deg, #2a2a2a, #4a4a4a);
-        }
-
-        .tool-screen {
-            justify-content: flex-start;
-            align-items: center;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            width: 100%;
-        }
-
-        .header h1 {
-            font-size: 24px;
-            color: #a0a0a0;
-            margin-bottom: 10px;
-        }
-
-        .timer-display {
-            font-size: 32px;
-            color: #90EE90;
-            text-shadow: 0 0 10px #90EE90;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-
-        .case-info {
-            font-size: 14px;
-            color: #888;
-            margin-bottom: 20px;
-        }
-
-        .tools-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .tool-btn {
-            padding: 30px 20px;
-            background: linear-gradient(145deg, #383838, #2a2a2a);
-            border: 2px solid #666;
-            color: #c0c0c0;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-        }
-
-        .tool-btn:hover {
-            border-color: #888;
-            background: linear-gradient(145deg, #4a4a4a, #3a3a3a);
-        }
-
-        .tool-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
-        }
-
-        .tool-icon {
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-
-        .tool-name {
-            font-size: 16px;
-            font-weight: bold;
-        }
-
-        .emf-container {
-            padding: 20px;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        .emf-header {
-            text-align: center;
-            margin-bottom: 20px;
-            border-bottom: 3px double #888888;
-            padding-bottom: 15px;
-        }
-
-        .back-btn {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            padding: 8px 15px;
-            background: linear-gradient(145deg, #3a3a3a, #2a2a2a);
-            border: 1px solid #666;
-            color: #888;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .status-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: linear-gradient(135deg, rgba(42, 42, 42, 0.9), rgba(26, 26, 26, 0.9));
-            border: 2px solid #606060;
-            padding: 12px 18px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.4);
-        }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            font-size: 12px;
-            color: #a0a0a0;
-            font-weight: bold;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
-        }
-
-        .power-button {
-            cursor: pointer;
-            padding: 6px 12px;
-            border: 2px solid #888888;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-            user-select: none;
-            background: linear-gradient(145deg, #3a3a3a, #2a2a2a);
-            margin-left: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(136, 136, 136, 0.2);
-        }
-
-        .power-button:hover {
-            background: linear-gradient(145deg, #4a4a4a, #3a3a3a);
-            border-color: #a0a0a0;
-            color: #c0c0c0;
-        }
-
-        .power-button.powered-on {
-            color: #90EE90;
-            border-color: #90EE90;
-            text-shadow: 0 0 8px #90EE90;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(144, 238, 144, 0.3), 0 0 10px rgba(144, 238, 144, 0.3);
-        }
-
-        .status-led {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 8px;
-            border: 1px solid rgba(0,0,0,0.4);
-        }
-
-        .status-led.green {
-            background: radial-gradient(circle, #32cd32, #228b22);
-            box-shadow: 0 0 8px rgba(50, 205, 50, 0.8), inset 0 0 4px rgba(255,255,255,0.3);
-        }
-
-        .status-led.red {
-            background: radial-gradient(circle, #dc143c, #8b0000);
-            box-shadow: 0 0 8px rgba(220, 20, 60, 0.8), inset 0 0 4px rgba(255,255,255,0.3);
-        }
-
-        .main-display {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 20px 0;
-        }
-
-        .emf-meter {
-            width: 280px;
-            height: 280px;
-            border: 4px solid #888888;
-            border-radius: 50%;
-            position: relative;
-            background: radial-gradient(circle at 30% 30%, #383838, #2a2a2a), radial-gradient(circle at 70% 70%, #404040, #2a2a2a);
-            box-shadow: 0 0 25px rgba(136, 136, 136, 0.6), inset 0 0 30px rgba(64, 64, 64, 0.4), inset 0 0 60px rgba(0,0,0,0.8);
-            margin-bottom: 30px;
-        }
-
-        .meter-face {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 240px;
-            height: 240px;
-            border-radius: 50%;
-            border: 2px solid #606060;
-            background: radial-gradient(circle at 40% 40%, #2f2f2f, #1a1a1a), radial-gradient(circle at 60% 60%, #383838, #1a1a1a);
-        }
-
-        .dial-numbers {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 280px;
-            height: 280px;
-            transform: translate(-50%, -50%);
-        }
-
-        .dial-number {
-            position: absolute;
-            font-size: 20px;
-            font-weight: bold;
-            color: #b8b8b8;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-            font-family: 'Times New Roman', serif;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .scale-marks {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 220px;
-            height: 220px;
-            transform: translate(-50%, -50%);
-        }
-
-        .scale-mark {
-            position: absolute;
-            width: 2px;
-            height: 12px;
-            background: linear-gradient(180deg, #b8b8b8, #888888);
-            top: 8px;
-            left: 50%;
-            transform-origin: 50% 102px;
-            box-shadow: 0 0 2px rgba(184, 184, 184, 0.4);
-        }
-
-        .scale-mark.major {
-            width: 3px;
-            height: 18px;
-            background: linear-gradient(180deg, #d0d0d0, #a0a0a0);
-            top: 2px;
-            box-shadow: 0 0 4px rgba(208, 208, 208, 0.6);
-        }
-
-        .needle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 3px;
-            height: 100px;
-            background: linear-gradient(180deg, #c0c0c0, #707070);
-            transform-origin: bottom center;
-            transform: translate(-50%, -100%) rotate(-90deg);
-            transition: transform 0.4s ease;
-            box-shadow: 0 0 8px rgba(192, 192, 192, 0.8), 2px 0 4px rgba(0,0,0,0.6);
-            border-radius: 2px;
-        }
-
-        .needle-center {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 16px;
-            height: 16px;
-            background: radial-gradient(circle, #d0d0d0, #a0a0a0);
-            border: 2px solid #606060;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px rgba(208, 208, 208, 0.6), inset 0 0 5px rgba(0,0,0,0.4);
-        }
-
-        .digital-reading {
-            text-align: center;
-            margin-bottom: 20px;
-            background: rgba(42, 42, 42, 0.6);
-            border: 2px solid #606060;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
-        }
-
-        .emf-value {
-            font-size: 48px;
-            color: #d0d0d0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(208, 208, 208, 0.6);
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-family: 'Times New Roman', serif;
-        }
-
-        .emf-unit {
-            font-size: 16px;
-            color: #a0a0a0;
-            font-style: italic;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
-        }
-
-        .ghost-status {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(42, 42, 42, 0.9);
-            border: 1px solid #666;
-            border-radius: 5px;
-            padding: 10px;
-            font-size: 12px;
-            color: #888;
-            max-width: 220px;
-            z-index: 10;
-        }
-    </style>
+    .ghost-status {
+      position:fixed; top:20px; right:20px;
+      background:rgba(42,42,42,0.9); border:1px solid #666; border-radius:5px;
+      padding:10px; font-size:12px; color:#888; max-width:240px; z-index:10;
+    }
+  </style>
 </head>
 <body>
-    <div class="static-overlay"></div>
+  <div class="static-overlay"></div>
 
-    <!-- Home Screen -->
-    <div id="homeScreen" class="screen home-screen active">
-        <div class="pcb-logo">PARANORMAL CONTAINMENT BUREAU</div>
-        <div class="home-subtitle">Investigation Kit v2.1</div>
+  <!-- 1) CALIBRATION -->
+  <div id="calibScreen" class="screen centered active">
+    <h2 style="margin-bottom:12px;">Movement Calibration</h2>
+    <p id="calibInstructions" style="max-width:300px; line-height:1.4;">
+      Stand in the centre, face the TV.<br><br>
+      Tap below and walk <strong>5 steps straight forward</strong>.
+    </p>
+    <button class="btn" id="calibActionBtn" onclick="startForwardCalib()">Start Forward</button>
+    <p id="calibProgress" style="margin-top:10px; font-size:12px; color:#aaa;">Forward: 0 / 5</p>
+  </div>
 
-        <input type="text" class="game-code-input" id="gameCodeInput" maxlength="4" placeholder="----">
-        <div style="margin-bottom: 20px; color: #888; font-size: 14px;">Enter 4-Digit Case File Code</div>
-
-        <button class="btn" onclick="startInvestigation()">Start Investigation</button>
-
-        <div style="margin-top: 40px; font-size: 12px; color: #666;">
-            Position yourself in the center of the investigation area before starting
-        </div>
+  <!-- 2) HOME -->
+  <div id="homeScreen" class="screen centered">
+    <div class="pcb-logo">PARANORMAL CONTAINMENT BUREAU</div>
+    <div class="home-subtitle">Investigation Kit v2.1</div>
+    <input type="text" class="game-code-input" id="gameCodeInput" maxlength="4" placeholder="----">
+    <div style="margin-bottom: 20px; color: #888; font-size: 14px;">Enter 4-Digit Case File Code</div>
+    <button class="btn" onclick="startInvestigation()">Start Investigation</button>
+    <div style="margin-top: 40px; font-size: 12px; color: #666;">
+      All players: same spot, same facing, same code.
     </div>
+  </div>
 
-    <!-- Tool Selection Screen -->
-    <div id="toolScreen" class="screen tool-screen">
-        <div class="header">
-            <h1>PCB Investigation Kit</h1>
-            <div class="timer-display" id="timerDisplay">00:00:00</div>
-            <div class="case-info">Case File: <span id="caseCode">----</span> | Status: <span id="investigationStatus">ACTIVE</span></div>
-        </div>
-
-        <div class="tools-grid">
-            <div class="tool-btn" onclick="openTool('emf')">
-                <div class="tool-icon">📊</div>
-                <div class="tool-name">EMF READER</div>
-            </div>
-
-            <div class="tool-btn disabled">
-                <div class="tool-icon">📻</div>
-                <div class="tool-name">SPIRIT BOX</div>
-                <div style="font-size: 10px; margin-top: 5px;">COMING SOON</div>
-            </div>
-
-            <div class="tool-btn disabled">
-                <div class="tool-icon">🎤</div>
-                <div class="tool-name">EVP RECORDER</div>
-                <div style="font-size: 10px; margin-top: 5px;">COMING SOON</div>
-            </div>
-
-            <div class="tool-btn disabled">
-                <div class="tool-icon">📷</div>
-                <div class="tool-name">CAMERA</div>
-                <div style="font-size: 10px; margin-top: 5px;">COMING SOON</div>
-            </div>
-        </div>
-
-        <button class="btn" onclick="endInvestigation()" style="margin-top: 40px; background: linear-gradient(145deg, #4a2a2a, #2a1a1a); border-color: #664444;">
-            End Investigation
-        </button>
+  <!-- 3) TOOL SELECTION -->
+  <div id="toolScreen" class="screen tool-screen">
+    <div class="header">
+      <h1>PCB Investigation Kit</h1>
+      <div class="timer-display" id="timerDisplay">00:00:00</div>
+      <div class="case-info">Case File: <span id="caseCode">----</span> | Status: <span id="investigationStatus">ACTIVE</span></div>
     </div>
+    <div class="tools-grid">
+      <div class="tool-btn" onclick="openTool('emf')">
+        <div class="tool-icon">📊</div>
+        <div class="tool-name">EMF READER</div>
+      </div>
+      <div class="tool-btn disabled">
+        <div class="tool-icon">📻</div>
+        <div class="tool-name">SPIRIT BOX</div>
+      </div>
+      <div class="tool-btn disabled">
+        <div class="tool-icon">🎤</div>
+        <div class="tool-name">EVP RECORDER</div>
+      </div>
+      <div class="tool-btn disabled">
+        <div class="tool-icon">📷</div>
+        <div class="tool-name">CAMERA</div>
+      </div>
+    </div>
+    <button class="btn" onclick="endInvestigation()" style="margin-top: 40px; background: linear-gradient(145deg, #4a2a2a, #2a1a1a); border-color: #664444;">
+      End Investigation
+    </button>
+  </div>
 
-    <!-- EMF Tool Screen -->
-    <div id="emfScreen" class="screen">
-        <div class="emf-container">
-            <button class="back-btn" onclick="backToTools()">← TOOLS</button>
-
-            <div class="emf-header">
-                <div style="font-size: 22px; font-weight: bold; color: #a0a0a0; margin-bottom: 8px;">ELECTROMAGNETIC FIELD DETECTOR</div>
-                <div style="font-size: 11px; color: #707070; font-style: italic;">Patent No. 1887-EMF-UK | Est. Her Majesty's Service</div>
-            </div>
-
-            <div class="status-bar">
-                <div class="status-item">
-                    <div class="status-led red" id="powerLed" style="opacity: 0.3;"></div>
-                    <span class="power-button" id="powerBtn">POWER</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-led red" id="calibLed" style="opacity: 0.3;"></div>
-                    <span>CALIBRATED</span>
-                </div>
-                <div class="status-item">
-                    <div class="status-led red" id="anomalyLed" style="opacity: 0.3;"></div>
-                    <span>ANOMALY</span>
-                </div>
-            </div>
-
-            <div class="main-display">
-                <div class="emf-meter">
-                    <div class="meter-face">
-                        <div class="dial-numbers"></div>
-                        <div class="scale-marks"></div>
-                        <div class="needle"></div>
-                        <div class="needle-center"></div>
-                    </div>
-                </div>
-
-                <div class="digital-reading">
-                    <div class="emf-value">0.00</div>
-                    <div class="emf-unit">Milligauss (Electromagnetic Flux)</div>
-                </div>
-            </div>
+  <!-- 4) EMF -->
+  <div id="emfScreen" class="screen">
+    <div class="emf-container">
+      <button class="back-btn" onclick="backToTools()">← TOOLS</button>
+      <div class="emf-header" style="text-align:center; margin-bottom:15px;">
+        <div style="font-size:22px; font-weight:bold; color:#a0a0a0;">ELECTROMAGNETIC FIELD DETECTOR</div>
+        <div style="font-size:11px; color:#707070; font-style:italic;">Patent No. 1887-EMF-UK | Est. Her Majesty's Service</div>
+      </div>
+      <div class="status-bar">
+        <div style="display:flex; align-items:center;">
+          <div class="status-led red" id="powerLed" style="opacity:0.3;"></div>
+          <span class="power-button" id="powerBtn" onclick="togglePower()">POWER</span>
         </div>
+        <div style="display:flex; align-items:center;">
+          <div class="status-led red" id="calibLed" style="opacity:0.3;"></div>
+          <span>CALIBRATED</span>
+        </div>
+        <div style="display:flex; align-items:center;">
+          <div class="status-led red" id="anomalyLed" style="opacity:0.3;"></div>
+          <span>ANOMALY</span>
+        </div>
+      </div>
+      <div class="main-display">
+        <div class="emf-meter">
+          <div class="meter-face">
+            <div class="dial-numbers"></div>
+            <div class="scale-marks"></div>
+            <div class="needle"></div>
+            <div class="needle-center" style="position:absolute; top:50%; left:50%; width:16px; height:16px; background:#d0d0d0; border-radius:50%; transform:translate(-50%,-50%);"></div>
+          </div>
+        </div>
+        <div class="digital-reading">
+          <div class="emf-value">0.00</div>
+          <div class="emf-unit">Milligauss (Electromagnetic Flux)</div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <!-- Debug Status -->
-    <div class="ghost-status" id="ghostStatus">
-        <div><strong>DEBUG MODE (INDOOR):</strong></div>
-        <div><strong>Ghost Location:</strong></div>
-        <div>X: <span id="ghostX">--</span></div>
-        <div>Y: <span id="ghostY">--</span></div>
-        <div>Floor: <span id="ghostFloor">--</span></div>
+  <!-- DEBUG -->
+  <div class="ghost-status">
+    <div><strong>DEBUG:</strong></div>
+    <div>Calib: <span id="dbgCalibPhase">idle</span></div>
+    <div>Ghost: (<span id="dbgGhostX">--</span>, <span id="dbgGhostY">--</span>)</div>
+    <div>Player: (<span id="dbgPlayerX">--</span>, <span id="dbgPlayerY">--</span>)</div>
+    <div>Steps: <span id="dbgSteps">0</span></div>
+    <div>In Zone: <span id="dbgInZone">NO</span></div>
+  </div>
 
-        <div style="margin-top: 10px;"><strong>Your Position:</strong></div>
-        <div>X: <span id="playerX">--</span></div>
-        <div>Y: <span id="playerY">--</span></div>
-        <div>Heading: <span id="playerHeading">--</span></div>
-        <div>Steps: <span id="stepCount">0</span></div>
+  <script>
+    // ===== GLOBAL STATE =====
+    let currentScreen = 'calibScreen';
 
-        <div style="margin-top: 10px;"><strong>Detection:</strong></div>
-        <div>Distance: <span id="ghostDistance">--</span></div>
-        <div>Floor Match: <span id="floorMatch">--</span></div>
-        <div>In Zone: <span id="inZone">NO</span></div>
-    </div>
+    // calibration phases: forward -> right -> back -> left -> done
+    let calibPhase = 'idle';
+    let forwardSamples = [];
+    let rightSamples = [];
+    let backSamples = [];
+    let leftSamples = [];
+    const REQUIRED_FORWARD = 5;
+    const REQUIRED_OTHERS = 3;
 
-    <script>
-        // Global game state
-        let gameCode = '';
-        let investigationActive = false;
-        let startTime = null;
-        let timerInterval = null;
-        let currentScreen = 'homeScreen';
+    let lastStepTime = 0;
 
-        // EMF state
-        let devicePowered = false;
-        let calibrationTimeout = null;
-        let emfAnimationInterval = null;
-        let currentEMF = 0.0;
+    // signatures
+    let sigForward = null;
+    let sigRight = null;
+    let sigBack = null;
+    let sigLeft = null;
 
-        // Indoor position state
-        let playerStartPos = null;
-        let ghostLocation = null;
-        let currentPosition = null;
+    // game
+    let gameCode = '';
+    let investigationActive = false;
+    let startTime = null;
+    let timerInterval = null;
 
-        // heading = 0 at start (our fake north)
-        let playerHeading = 0;
-        let headingBaseline = null; // first orientation value
-        let stepCount = 0;
-        const STEP_LENGTH = 0.7;
-        let lastStepTime = 0;
-        let lastMotionTimestamp = null; // for gyro integration
+    // movement
+    let playerX = 0;
+    let playerY = 0;
+    let stepCount = 0;
+    let avgStepLength = 0.7;
 
-        // Generate ghost 2–4m away
-        function generateGhostLocation(startX, startY, startAlt) {
-            const distance = 2 + Math.random() * 2;
-            const angle = Math.random() * 2 * Math.PI;
+    // ghost
+    let ghostX = 0;
+    let ghostY = 0;
 
-            const isUpstairs = Math.random() < 0.4;
-            const altOffset = isUpstairs ? 3 : 0;
+    // EMF
+    let devicePowered = false;
+    let emfAnimationInterval = null;
+    let currentEMF = 0.0;
 
-            return {
-                x: startX + Math.cos(angle) * distance,
-                y: startY + Math.sin(angle) * distance,
-                alt: startAlt + altOffset,
-                floor: isUpstairs ? 'upstairs' : 'ground floor',
-                distance: distance
-            };
-        }
+    // ===== UI HELPERS =====
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      currentScreen = id;
+    }
 
-        function isInGhostZone() {
-            if (!currentPosition || !ghostLocation) return false;
+    function updateDebug() {
+      document.getElementById('dbgCalibPhase').textContent = calibPhase;
+      document.getElementById('dbgGhostX').textContent = ghostX ? ghostX.toFixed(2) : '--';
+      document.getElementById('dbgGhostY').textContent = ghostY ? ghostY.toFixed(2) : '--';
+      document.getElementById('dbgPlayerX').textContent = playerX.toFixed(2);
+      document.getElementById('dbgPlayerY').textContent = playerY.toFixed(2);
+      document.getElementById('dbgSteps').textContent = stepCount;
+    }
 
-            const dx = (currentPosition.x || 0) - ghostLocation.x;
-            const dy = (currentPosition.y || 0) - ghostLocation.y;
-            const horizontalDistance = Math.sqrt(dx * dx + dy * dy);
+    // ===== CALIBRATION =====
+    function startForwardCalib() {
+      calibPhase = 'forward';
+      document.getElementById('calibInstructions').textContent =
+        'Walk 5 normal steps straight ahead.';
+      document.getElementById('calibActionBtn').style.display = 'none';
+      document.getElementById('calibProgress').textContent = 'Forward: 0 / 5';
+      updateDebug();
+    }
 
-            const verticalDistance = Math.abs((currentPosition.alt || 0) - ghostLocation.alt);
-            const DETECTION_RADIUS = 1.5;
-            const inHorizontalZone = horizontalDistance <= DETECTION_RADIUS;
-            const onSameFloor = verticalDistance <= 1;
+    function startRightCalib() {
+      calibPhase = 'right';
+      document.getElementById('calibInstructions').textContent =
+        'Turn RIGHT ~90° and walk 3 steps.';
+      document.getElementById('calibProgress').textContent = 'Right: 0 / 3';
+      updateDebug();
+    }
 
-            document.getElementById('ghostX').textContent = ghostLocation.x.toFixed(2) + 'm';
-            document.getElementById('ghostY').textContent = ghostLocation.y.toFixed(2) + 'm';
-            document.getElementById('ghostFloor').textContent = ghostLocation.floor;
+    function startBackCalib() {
+      calibPhase = 'back';
+      document.getElementById('calibInstructions').textContent =
+        'Turn BACK (180°) and walk 3 steps.';
+      document.getElementById('calibProgress').textContent = 'Back: 0 / 3';
+      updateDebug();
+    }
 
-            document.getElementById('playerX').textContent = currentPosition ? (currentPosition.x || 0).toFixed(2) + 'm' : '--';
-            document.getElementById('playerY').textContent = currentPosition ? (currentPosition.y || 0).toFixed(2) + 'm' : '--';
-            document.getElementById('playerHeading').textContent = Math.round(playerHeading) + '°';
-            document.getElementById('stepCount').textContent = stepCount;
+    function startLeftCalib() {
+      calibPhase = 'left';
+      document.getElementById('calibInstructions').textContent =
+        'Turn LEFT ~90° and walk 3 steps.';
+      document.getElementById('calibProgress').textContent = 'Left: 0 / 3';
+      updateDebug();
+    }
 
-            document.getElementById('ghostDistance').textContent = horizontalDistance.toFixed(2) + 'm';
-            document.getElementById('floorMatch').textContent = onSameFloor ? 'YES' : 'NO';
-            document.getElementById('inZone').textContent = (inHorizontalZone && onSameFloor) ? 'YES' : 'NO';
+    function buildSignature(samples) {
+      if (!samples.length) return null;
+      let sx=0, sy=0, sz=0;
+      samples.forEach(s => { sx+=s.x; sy+=s.y; sz+=s.z; });
+      const n = samples.length;
+      const v = { x: sx/n, y: sy/n, z: sz/n };
+      const m = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+      return m ? { x:v.x/m, y:v.y/m, z:v.z/m } : {x:0,y:0,z:0};
+    }
 
-            return inHorizontalZone && onSameFloor;
-        }
+    function finishCalibration() {
+      calibPhase = 'done';
+      sigForward = buildSignature(forwardSamples);
+      sigRight   = buildSignature(rightSamples);
+      sigBack    = buildSignature(backSamples);
+      sigLeft    = buildSignature(leftSamples);
 
-        function startInvestigation() {
-            const input = document.getElementById('gameCodeInput');
-            const code = input.value;
+      document.getElementById('calibInstructions').textContent =
+        'Calibration complete. Continue to case code.';
+      const btn = document.getElementById('calibActionBtn');
+      btn.style.display = 'inline-block';
+      btn.textContent = 'Continue';
+      btn.onclick = () => showScreen('homeScreen');
+      document.getElementById('calibProgress').textContent = '';
+      updateDebug();
+    }
 
-            if (code.length !== 4) {
-                alert('Please enter a 4-digit code');
-                return;
+    function normalizeVec(v) {
+      const m = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+      if (!m) return {x:0,y:0,z:0};
+      return {x:v.x/m, y:v.y/m, z:v.z/m};
+    }
+
+    // ===== DEVICE MOTION =====
+    if (window.DeviceMotionEvent) {
+      window.addEventListener('devicemotion', function(e){
+        const now = Date.now();
+        const acc = e.acceleration && e.acceleration.x !== null ? e.acceleration : e.accelerationIncludingGravity;
+        if (!acc) return;
+
+        const mag = Math.sqrt(acc.x*acc.x + acc.y*acc.y + acc.z*acc.z);
+        if (mag > 3.8 && (now - lastStepTime) > 200) {
+          lastStepTime = now;
+          const sample = normalizeVec({x:acc.x, y:acc.y, z:acc.z});
+
+          if (calibPhase === 'forward') {
+            forwardSamples.push(sample);
+            document.getElementById('calibProgress').textContent =
+              'Forward: '+forwardSamples.length+' / '+REQUIRED_FORWARD;
+            if (forwardSamples.length >= REQUIRED_FORWARD) {
+              // we can estimate step length here if you want, for now keep 0.7
+              startRightCalib();
             }
-
-            playerStartPos = { x: 0, y: 0, alt: 0, floor: 'ground floor' };
-            currentPosition = { x: 0, y: 0, alt: 0, floor: 'ground floor' };
-
-            ghostLocation = generateGhostLocation(playerStartPos.x, playerStartPos.y, playerStartPos.alt);
-
-            gameCode = code;
-            investigationActive = true;
-            startTime = Date.now();
-
-            document.getElementById('caseCode').textContent = code;
-            showScreen('toolScreen');
-            startTimer();
-
-            isInGhostZone();
-        }
-
-        function openTool(toolName) {
-            if (toolName === 'emf') {
-                showScreen('emfScreen');
-                startIndoorTracking();
+          } else if (calibPhase === 'right') {
+            rightSamples.push(sample);
+            document.getElementById('calibProgress').textContent =
+              'Right: '+rightSamples.length+' / '+REQUIRED_OTHERS;
+            if (rightSamples.length >= REQUIRED_OTHERS) {
+              startBackCalib();
             }
-        }
-
-        function initOrientationListener() {
-            if (!window.DeviceOrientationEvent) return;
-
-            window.addEventListener('deviceorientation', function (event) {
-                try {
-                    if (typeof event.alpha !== 'number') return;
-
-                    let raw = event.alpha;
-
-                    if (headingBaseline === null) {
-                        headingBaseline = raw;
-                        playerHeading = 0;
-                        isInGhostZone();
-                        return;
-                    }
-
-                    let delta = raw - headingBaseline;
-                    if (delta > 180) delta -= 360;
-                    if (delta < -180) delta += 360;
-
-                    // exaggerate small changes
-                    delta = delta * 2;
-                    playerHeading = (delta + 360) % 360;
-                    isInGhostZone();
-                } catch (e) {
-                    console.warn('orientation err', e);
-                }
-            }, true);
-        }
-
-        function startIndoorTracking() {
-            initOrientationListener();
-
-            if (window.DeviceMotionEvent) {
-                window.addEventListener('devicemotion', function (event) {
-                    const now = Date.now();
-
-                    // gyro fallback (if orientation didn't fire, this will still rotate us)
-                    try {
-                        if (event.rotationRate && typeof event.rotationRate.alpha === 'number') {
-                            let dt = 0;
-                            if (lastMotionTimestamp !== null) {
-                                dt = (now - lastMotionTimestamp) / 1000;
-                            }
-                            lastMotionTimestamp = now;
-
-                            if (dt > 0) {
-                                // alpha is deg/sec around Z
-                                const yawSpeed = event.rotationRate.alpha;
-                                if (!isNaN(yawSpeed)) {
-                                    playerHeading = (playerHeading + yawSpeed * dt) % 360;
-                                    if (playerHeading < 0) playerHeading += 360;
-                                }
-                            }
-                        } else {
-                            lastMotionTimestamp = now;
-                        }
-                    } catch (e) {
-                        // ignore
-                    }
-
-                    // step detection
-                    try {
-                        const acc = event.acceleration && (event.acceleration.x !== null)
-                            ? event.acceleration
-                            : event.accelerationIncludingGravity;
-
-                        if (acc) {
-                            const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-                            if (magnitude > 3.8 && (now - lastStepTime) > 200) {
-                                performStep();
-                                lastStepTime = now;
-                            }
-                        }
-                    } catch (e) {
-                        // ignore
-                    }
-
-                    isInGhostZone();
-                });
+          } else if (calibPhase === 'back') {
+            backSamples.push(sample);
+            document.getElementById('calibProgress').textContent =
+              'Back: '+backSamples.length+' / '+REQUIRED_OTHERS;
+            if (backSamples.length >= REQUIRED_OTHERS) {
+              startLeftCalib();
             }
-
-            isInGhostZone();
-        }
-
-        function performStep(customLength) {
-            const len = customLength || STEP_LENGTH;
-            // heading 0 = move +X
-            const rad = playerHeading * Math.PI / 180;
-
-            if (!currentPosition) {
-                currentPosition = { x: 0, y: 0, alt: 0, floor: 'ground floor' };
+          } else if (calibPhase === 'left') {
+            leftSamples.push(sample);
+            document.getElementById('calibProgress').textContent =
+              'Left: '+leftSamples.length+' / '+REQUIRED_OTHERS;
+            if (leftSamples.length >= REQUIRED_OTHERS) {
+              finishCalibration();
             }
-
-            currentPosition.x += Math.cos(rad) * len;
-            currentPosition.y += Math.sin(rad) * len;
-            stepCount++;
-            isInGhostZone();
+          } else if (calibPhase === 'done' && investigationActive) {
+            handleGameplayStep(sample);
+          }
         }
+      });
+    }
 
-        function startTimer() {
-            timerInterval = setInterval(updateTimer, 1000);
+    // ===== GAMEPLAY STEP CLASSIFICATION =====
+    function handleGameplayStep(sampleVec) {
+      // compare to 4 signatures
+      const candidates = [];
+      if (sigForward) candidates.push({name:'forward', sig:sigForward});
+      if (sigRight)   candidates.push({name:'right',   sig:sigRight});
+      if (sigBack)    candidates.push({name:'back',    sig:sigBack});
+      if (sigLeft)    candidates.push({name:'left',    sig:sigLeft});
+
+      let bestName = null;
+      let bestDot = -999;
+      candidates.forEach(c => {
+        const dot = c.sig.x*sampleVec.x + c.sig.y*sampleVec.y + c.sig.z*sampleVec.z;
+        if (dot > bestDot) {
+          bestDot = dot;
+          bestName = c.name;
         }
+      });
 
-        function updateTimer() {
-            if (!investigationActive || !startTime) return;
+      // move according to direction
+      switch (bestName) {
+        case 'forward': playerX += avgStepLength; break;
+        case 'back':    playerX -= avgStepLength; break;
+        case 'right':   playerY += avgStepLength; break;
+        case 'left':    playerY -= avgStepLength; break;
+      }
+      stepCount++;
+      checkGhostZone();
+      updateDebug();
+    }
 
-            const elapsed = Date.now() - startTime;
-            const seconds = Math.floor(elapsed / 1000);
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            const secs = seconds % 60;
+    // ===== INVESTIGATION =====
+    function caseCodeToDistance(code) {
+      let sum=0;
+      for (let i=0;i<code.length;i++) {
+        const d = parseInt(code[i],10);
+        if (!isNaN(d)) sum += d;
+      }
+      const t = (sum % 37) / 36; // 0..1
+      return 2 + t * 2; // 2..4m
+    }
+    function caseCodeToAngle(code) {
+      const n = parseInt(code,10);
+      if (isNaN(n)) return 0;
+      return n % 360;
+    }
 
-            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            document.getElementById('timerDisplay').textContent = timeString;
+    function startInvestigation() {
+      const input = document.getElementById('gameCodeInput');
+      const code = input.value;
+      if (code.length !== 4) {
+        alert('Please enter a 4-digit code');
+        return;
+      }
+      if (calibPhase !== 'done') {
+        alert('Please complete calibration first.');
+        return;
+      }
+
+      // place ghost from code
+      const dist = caseCodeToDistance(code);
+      const angDeg = caseCodeToAngle(code);
+      const angRad = angDeg * Math.PI / 180;
+      ghostX = Math.cos(angRad) * dist;
+      ghostY = Math.sin(angRad) * dist;
+
+      // reset player
+      playerX = 0;
+      playerY = 0;
+      stepCount = 0;
+
+      gameCode = code;
+      investigationActive = true;
+      startTime = Date.now();
+
+      document.getElementById('caseCode').textContent = code;
+      showScreen('toolScreen');
+      startTimer();
+      updateDebug();
+    }
+
+    function startTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (!investigationActive || !startTime) return;
+        const elapsed = Date.now() - startTime;
+        const s = Math.floor(elapsed / 1000);
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600)/60);
+        const sec = s % 60;
+        document.getElementById('timerDisplay').textContent =
+          `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+      }, 1000);
+    }
+
+    function checkGhostZone() {
+      const dx = playerX - ghostX;
+      const dy = playerY - ghostY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const inZone = dist <= 1.0;
+      document.getElementById('dbgInZone').textContent = inZone ? 'YES' : 'NO';
+      return inZone;
+    }
+
+    function openTool(name) {
+      if (name === 'emf') {
+        showScreen('emfScreen');
+      }
+    }
+
+    function endInvestigation() {
+      if (!confirm('End investigation?')) return;
+      investigationActive = false;
+      gameCode = '';
+      playerX = 0; playerY = 0; stepCount = 0;
+      stopEMFReadings();
+      showScreen('homeScreen');
+      updateDebug();
+    }
+
+    function backToTools() {
+      if (devicePowered) togglePower();
+      showScreen('toolScreen');
+    }
+
+    // ===== EMF =====
+    function createDial() {
+      const dial = document.querySelector('.dial-numbers');
+      const marks = document.querySelector('.scale-marks');
+      if (!dial || !marks) return;
+      for (let i=0;i<=10;i++) {
+        const num = document.createElement('div');
+        num.className = 'dial-number';
+        num.textContent = i;
+        const angle = 180 + (i * 18);
+        const radius = 130;
+        const rad = angle * Math.PI / 180;
+        const x = Math.cos(rad) * radius;
+        const y = Math.sin(rad) * radius;
+        num.style.left = `calc(50% + ${x}px - 12px)`;
+        num.style.top = `calc(50% + ${y}px - 12px)`;
+        dial.appendChild(num);
+      }
+      for (let i=0;i<=10;i++) {
+        const mark = document.createElement('div');
+        mark.className = 'scale-mark';
+        const mathAngle = 180 + (i*18);
+        const cssAngle = mathAngle - 270;
+        mark.style.transform = `rotate(${cssAngle}deg)`;
+        marks.appendChild(mark);
+      }
+    }
+
+    function updateEMFDisplay(val) {
+      document.querySelector('.emf-value').textContent = val.toFixed(2);
+      const needle = document.querySelector('.needle');
+      if (needle) {
+        const angle = -90 + (val * 18);
+        needle.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+      }
+    }
+
+    function generateEMFReading() {
+      if (!devicePowered) return;
+      let target;
+      if (checkGhostZone()) {
+        target = 4.8 + Math.random() * 0.4;
+        document.getElementById('anomalyLed').style.opacity = '1';
+      } else {
+        target = 0.5 + (Math.random()-0.5)*0.3;
+        document.getElementById('anomalyLed').style.opacity = '0.3';
+      }
+      currentEMF += (target - currentEMF) * 0.1;
+      updateEMFDisplay(currentEMF);
+    }
+
+    function startEMFReadings() {
+      if (emfAnimationInterval) clearInterval(emfAnimationInterval);
+      emfAnimationInterval = setInterval(generateEMFReading, 200);
+    }
+
+    function stopEMFReadings() {
+      if (emfAnimationInterval) clearInterval(emfAnimationInterval);
+      emfAnimationInterval = null;
+      currentEMF = 0.0;
+      updateEMFDisplay(currentEMF);
+      document.getElementById('anomalyLed').style.opacity = '0.3';
+    }
+
+    function togglePower() {
+      if (!investigationActive) {
+        alert('Start an investigation first');
+        return;
+      }
+      devicePowered = !devicePowered;
+      const powerLed = document.getElementById('powerLed');
+      const calibLed = document.getElementById('calibLed');
+      if (devicePowered) {
+        powerLed.style.opacity = '1';
+        calibLed.style.opacity = '1';
+        startEMFReadings();
+      } else {
+        powerLed.style.opacity = '0.3';
+        calibLed.style.opacity = '0.3';
+        stopEMFReadings();
+      }
+    }
+
+    // ===== INIT =====
+    document.addEventListener('DOMContentLoaded', function(){
+      createDial();
+      // code input numeric
+      document.getElementById('gameCodeInput').addEventListener('keypress', function(e){
+        if (e.key === 'Enter') startInvestigation();
+        if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Enter') {
+          e.preventDefault();
         }
-
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.classList.remove('active');
-            });
-            document.getElementById(screenId).classList.add('active');
-            currentScreen = screenId;
-        }
-
-        function backToTools() {
-            if (devicePowered) {
-                togglePower();
-            }
-            showScreen('toolScreen');
-        }
-
-        function endInvestigation() {
-            if (confirm('Are you sure you want to end the current investigation?')) {
-                investigationActive = false;
-                devicePowered = false;
-                gameCode = '';
-
-                if (timerInterval) {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
-                }
-
-                if (calibrationTimeout) {
-                    clearTimeout(calibrationTimeout);
-                    calibrationTimeout = null;
-                }
-
-                stopEMFReadings();
-
-                playerStartPos = null;
-                ghostLocation = null;
-                currentPosition = null;
-                playerHeading = 0;
-                headingBaseline = null;
-                stepCount = 0;
-                lastStepTime = 0;
-                lastMotionTimestamp = null;
-
-                document.getElementById('gameCodeInput').value = '';
-                showScreen('homeScreen');
-
-                document.querySelector('.emf-value').textContent = '0.00';
-                document.getElementById('powerBtn').classList.remove('powered-on');
-
-                ['powerLed', 'calibLed', 'anomalyLed'].forEach(id => {
-                    const led = document.getElementById(id);
-                    led.className = 'status-led red';
-                    led.style.opacity = '0.3';
-                });
-
-                document.getElementById('ghostX').textContent = '--';
-                document.getElementById('ghostY').textContent = '--';
-                document.getElementById('ghostFloor').textContent = '--';
-                document.getElementById('playerX').textContent = '--';
-                document.getElementById('playerY').textContent = '--';
-                document.getElementById('playerHeading').textContent = '--';
-                document.getElementById('stepCount').textContent = '0';
-                document.getElementById('ghostDistance').textContent = '--';
-                document.getElementById('floorMatch').textContent = '--';
-                document.getElementById('inZone').textContent = 'NO';
-            }
-        }
-
-        function createDialNumbers() {
-            const dialNumbers = document.querySelector('.dial-numbers');
-            for (let i = 0; i <= 10; i++) {
-                const number = document.createElement('div');
-                number.className = 'dial-number';
-                number.textContent = i;
-
-                const angle = 180 + (i * 18);
-                const radius = 130;
-                const radian = (angle * Math.PI) / 180;
-                const x = Math.cos(radian) * radius;
-                const y = Math.sin(radian) * radius;
-
-                number.style.left = `calc(50% + ${x}px - 12px)`;
-                number.style.top = `calc(50% + ${y}px - 12px)`;
-
-                dialNumbers.appendChild(number);
-            }
-        }
-
-        function createScaleMarks() {
-            const scaleMarks = document.querySelector('.scale-marks');
-
-            for (let i = 0; i <= 10; i++) {
-                const mark = document.createElement('div');
-                mark.className = 'scale-mark major';
-                const mathAngle = 180 + (i * 18);
-                const cssAngle = mathAngle - 270;
-                mark.style.transform = `rotate(${cssAngle}deg)`;
-                scaleMarks.appendChild(mark);
-            }
-
-            for (let i = 0; i < 10; i++) {
-                const mark = document.createElement('div');
-                mark.className = 'scale-mark';
-                const mathAngle = 180 + (i * 18) + 9;
-                const cssAngle = mathAngle - 270;
-                mark.style.transform = `rotate(${cssAngle}deg)`;
-                scaleMarks.appendChild(mark);
-            }
-        }
-
-        function updateEMFDisplay(emfValue) {
-            document.querySelector('.emf-value').textContent = emfValue.toFixed(2);
-
-            const needleAngle = -90 + (emfValue * 18);
-            const needle = document.querySelector('.needle');
-            if (needle) {
-                needle.style.transform = `translate(-50%, -100%) rotate(${needleAngle}deg)`;
-            }
-        }
-
-        function generateEMFReading() {
-            if (!devicePowered) return;
-
-            let targetEMF;
-
-            if (isInGhostZone()) {
-                targetEMF = 4.8 + Math.random() * 0.4;
-                const anomalyLed = document.getElementById('anomalyLed');
-                anomalyLed.className = 'status-led red';
-                anomalyLed.style.opacity = '1';
-            } else {
-                const baseLevel = 0.5;
-                const variation = (Math.random() - 0.5) * 0.8;
-                targetEMF = Math.max(0.1, Math.min(1.0, baseLevel + variation));
-                const anomalyLed = document.getElementById('anomalyLed');
-                anomalyLed.className = 'status-led red';
-                anomalyLed.style.opacity = '0.3';
-            }
-
-            const step = (targetEMF - currentEMF) * 0.1;
-            currentEMF += step;
-            currentEMF = Math.max(0.0, Math.min(10.0, currentEMF));
-
-            updateEMFDisplay(currentEMF);
-        }
-
-        function startEMFReadings() {
-            if (emfAnimationInterval) {
-                clearInterval(emfAnimationInterval);
-            }
-
-            emfAnimationInterval = setInterval(generateEMFReading, 200);
-        }
-
-        function stopEMFReadings() {
-            if (emfAnimationInterval) {
-                clearInterval(emfAnimationInterval);
-                emfAnimationInterval = null;
-            }
-
-            currentEMF = 0.0;
-            updateEMFDisplay(currentEMF);
-
-            const anomalyLed = document.getElementById('anomalyLed');
-            anomalyLed.className = 'status-led red';
-            anomalyLed.style.opacity = '0.3';
-        }
-
-        function togglePower() {
-            if (!investigationActive) {
-                alert('Please start an investigation first');
-                return;
-            }
-
-            const powerBtn = document.getElementById('powerBtn');
-            const powerLed = document.getElementById('powerLed');
-            const calibLed = document.getElementById('calibLed');
-
-            if (calibrationTimeout) {
-                clearTimeout(calibrationTimeout);
-                calibrationTimeout = null;
-            }
-
-            devicePowered = !devicePowered;
-
-            if (devicePowered) {
-                powerBtn.classList.add('powered-on');
-                powerLed.className = 'status-led green';
-                powerLed.style.opacity = '1';
-
-                calibrationTimeout = setTimeout(() => {
-                    if (devicePowered) {
-                        calibLed.className = 'status-led green';
-                        calibLed.style.opacity = '1';
-                    }
-                    calibrationTimeout = null;
-                }, 500);
-
-                startEMFReadings();
-            } else {
-                powerBtn.classList.remove('powered-on');
-                powerLed.className = 'status-led red';
-                powerLed.style.opacity = '0.3';
-                calibLed.className = 'status-led red';
-                calibLed.style.opacity = '0.3';
-
-                stopEMFReadings();
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            createDialNumbers();
-            createScaleMarks();
-
-            document.getElementById('powerBtn').addEventListener('click', togglePower);
-
-            document.getElementById('gameCodeInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    startInvestigation();
-                }
-                if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Enter') {
-                    e.preventDefault();
-                }
-            });
-        });
-    </script>
+      });
+      updateDebug();
+    });
+  </script>
 </body>
 </html>
