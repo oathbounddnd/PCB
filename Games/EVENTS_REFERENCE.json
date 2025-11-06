@@ -1,0 +1,22 @@
+PCB EVENTS REFERENCE - What You Can Type
+===============================================
+
+EMF EVENTS:
+- emf_spike: 5.1 (any number 1-6)
+- duration: 3 (seconds)
+
+AUDIO:
+- audio: "filename.mp3"
+- volume: quiet, medium, loud
+
+AUTO EVENTS (no setup needed):
+- door_slam (auto plays sound + EMF 4.2 + shake)  
+- door_creak (auto plays sound + EMF 2.8)
+- lights_flicker (auto flickers for 3 seconds)
+- screen_shake (auto shakes screen)
+
+GHOST MOVEMENT:
+- ghost_moves_to: "room_name"
+
+THAT'S IT. 
+Only use these exact words.
