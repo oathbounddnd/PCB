@@ -24,7 +24,6 @@
             position: relative;
         }
 
-        /* Static overlay for all screens */
         .static-overlay {
             position: absolute;
             top: 0;
@@ -46,7 +45,6 @@
             100% { opacity: 0.5; }
         }
 
-        /* Screen management */
         .screen {
             position: relative;
             z-index: 2;
@@ -60,7 +58,6 @@
             flex-direction: column;
         }
 
-        /* Home Screen */
         .home-screen {
             justify-content: center;
             align-items: center;
@@ -127,7 +124,6 @@
             background: linear-gradient(145deg, #2a2a2a, #4a4a4a);
         }
 
-        /* Tool Selection Screen */
         .tool-screen {
             justify-content: flex-start;
             align-items: center;
@@ -199,7 +195,6 @@
             font-weight: bold;
         }
 
-        /* EMF Tool */
         .emf-container {
             padding: 20px;
             height: 100vh;
@@ -575,11 +570,6 @@
         <div>Distance: <span id="ghostDistance">--</span></div>
         <div>Floor Match: <span id="floorMatch">--</span></div>
         <div>In Zone: <span id="inZone">NO</span></div>
-
-        <div style="margin-top: 10px;"><strong>Manual Controls:</strong></div>
-        <button class="mini-btn" onclick="performStep()">Step +1</button>
-        <button class="mini-btn" onclick="rotatePlayer(-15)">Turn -15°</button>
-        <button class="mini-btn" onclick="rotatePlayer(15)">Turn +15°</button>
     </div>
 
     <script>
@@ -596,21 +586,22 @@
         let emfAnimationInterval = null;
         let currentEMF = 0.0;
 
-        // Indoor position state (step counter + compass)
+        // Indoor position state
         let playerStartPos = null;
         let ghostLocation = null;
         let currentPosition = null;
-        let playerHeading = 0;      // degrees
+        let playerHeading = 0; // degrees
         let stepCount = 0;
         const STEP_LENGTH = 0.7;
         let lastStepTime = 0;
+        let lastMotionTimestamp = null; // for integrating rotation
 
-        // Indoor ghost location generation (2-4 meters from origin in 2D, optional upstairs)
+        // Generate ghost 2–4m away
         function generateGhostLocation(startX, startY, startAlt) {
-            const distance = 2 + Math.random() * 2; // 2–4m
+            const distance = 2 + Math.random() * 2;
             const angle = Math.random() * 2 * Math.PI;
 
-            const isUpstairs = Math.random() < 0.4; // 40% chance upstairs
+            const isUpstairs = Math.random() < 0.4;
             const altOffset = isUpstairs ? 3 : 0;
 
             return {
@@ -622,7 +613,6 @@
             };
         }
 
-        // Check if player is in ghost detection zone (indoor 2D)
         function isInGhostZone() {
             if (!currentPosition || !ghostLocation) return false;
 
@@ -631,12 +621,10 @@
             const horizontalDistance = Math.sqrt(dx * dx + dy * dy);
 
             const verticalDistance = Math.abs((currentPosition.alt || 0) - ghostLocation.alt);
-            const DETECTION_RADIUS = 1.5; // set to 1.0 for 1m
-const inHorizontalZone = horizontalDistance <= DETECTION_RADIUS;
-const onSameFloor = verticalDistance <= 1;
+            const DETECTION_RADIUS = 1.5; // tighten zone
+            const inHorizontalZone = horizontalDistance <= DETECTION_RADIUS;
+            const onSameFloor = verticalDistance <= 1;
 
-
-            // Update indoor debug panel
             document.getElementById('ghostX').textContent = ghostLocation.x.toFixed(2) + 'm';
             document.getElementById('ghostY').textContent = ghostLocation.y.toFixed(2) + 'm';
             document.getElementById('ghostFloor').textContent = ghostLocation.floor;
@@ -653,118 +641,87 @@ const onSameFloor = verticalDistance <= 1;
             return inHorizontalZone && onSameFloor;
         }
 
-        // Start investigation (indoor)
         function startInvestigation() {
             const input = document.getElementById('gameCodeInput');
             const code = input.value;
-
-            console.log('Starting investigation with code (indoor mode):', code);
 
             if (code.length !== 4) {
                 alert('Please enter a 4-digit code');
                 return;
             }
 
-            // Define indoor origin (0,0) at start
-            playerStartPos = {
-                x: 0,
-                y: 0,
-                alt: 0,
-                floor: 'ground floor'
-            };
+            playerStartPos = { x: 0, y: 0, alt: 0, floor: 'ground floor' };
+            currentPosition = { x: 0, y: 0, alt: 0, floor: 'ground floor' };
 
-            // Current player state
-            currentPosition = {
-                x: 0,
-                y: 0,
-                alt: 0,
-                floor: 'ground floor'
-            };
-
-            // Generate ghost somewhere 2–4m away
-            ghostLocation = generateGhostLocation(
-                playerStartPos.x,
-                playerStartPos.y,
-                playerStartPos.alt
-            );
+            ghostLocation = generateGhostLocation(playerStartPos.x, playerStartPos.y, playerStartPos.alt);
 
             gameCode = code;
             investigationActive = true;
             startTime = Date.now();
 
-            // Update UI
             document.getElementById('caseCode').textContent = code;
             showScreen('toolScreen');
             startTimer();
 
-            // Start indoor tracking (step + compass)
-            startIndoorTracking();
-
-            // Update debug immediately
+            // we start sensors when user opens EMF
             isInGhostZone();
+        }
 
-            console.log('Investigation started successfully (indoor mode)');
+        // auto-start sensors when EMF is opened
+        function openTool(toolName) {
+            if (toolName === 'emf') {
+                showScreen('emfScreen');
+                try {
+                    startIndoorTracking();
+                    console.log('Indoor tracking started from EMF open');
+                } catch (e) {
+                    console.warn('Could not start tracking', e);
+                }
+            }
         }
 
         function startIndoorTracking() {
-            // try absolute orientation first (better on some Androids)
-function handleOrientation(event) {
-    let heading = null;
-
-    // iOS-style
-    if (typeof event.webkitCompassHeading === 'number') {
-        heading = event.webkitCompassHeading; // already 0–360
-    } else if (event.absolute && typeof event.alpha === 'number') {
-        // absolute alpha, often 0 = north
-        heading = event.alpha;
-    } else if (typeof event.alpha === 'number') {
-        // fallback: convert alpha to compass-ish
-        // many browsers give alpha 0 facing east, so flip it
-        heading = 360 - event.alpha;
-    }
-
-    if (heading !== null) {
-        // normalise
-        heading = (heading + 360) % 360;
-        playerHeading = heading;
-        // update zone + debug
-        isInGhostZone();
-    }
-}
-
-if (window.DeviceOrientationEvent) {
-    // some browsers fire this
-    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-    // and we also listen to the normal one as backup
-    window.addEventListener('deviceorientation', handleOrientation, true);
-}
-
-
-            // Step detection (simple) using accelerometer
+            // Single devicemotion listener for BOTH steps and heading
             if (window.DeviceMotionEvent) {
-    window.addEventListener('devicemotion', function (event) {
-        // prefer acceleration WITHOUT gravity if available
-        const acc = event.acceleration && (event.acceleration.x !== null)
-            ? event.acceleration
-            : event.accelerationIncludingGravity;
+                window.addEventListener('devicemotion', function (event) {
+                    const now = Date.now();
+                    let dt = 0;
+                    if (lastMotionTimestamp !== null) {
+                        dt = (now - lastMotionTimestamp) / 1000; // seconds
+                    }
+                    lastMotionTimestamp = now;
 
-        if (!acc) return;
+                    // 1) integrate rotation → heading
+                    if (event.rotationRate && typeof event.rotationRate.alpha === 'number') {
+                        // alpha is rotation around Z (yaw) in deg/sec on many Androids
+                        const yawSpeed = event.rotationRate.alpha; // deg/sec
+                        if (!isNaN(yawSpeed) && dt > 0) {
+                            playerHeading = (playerHeading + yawSpeed * dt) % 360;
+                            if (playerHeading < 0) playerHeading += 360;
+                        }
+                    }
 
-        // overall movement strength
-        const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-        const now = Date.now();
+                    // 2) detect step → move forward in heading
+                    const acc = event.acceleration && (event.acceleration.x !== null)
+                        ? event.acceleration
+                        : event.accelerationIncludingGravity;
 
-        // more sensitive: 7.5 instead of 11, and 250ms between steps
-        if (magnitude > 7.5 && (now - lastStepTime) > 250) {
-            console.log('Step detected (magnitude=' + magnitude.toFixed(2) + ')');
-            performStep();
-            lastStepTime = now;
-        }
-    });
-}
+                    if (acc) {
+                        const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+                        // more sensitive now
+                        if (magnitude > 4.5 && (now - lastStepTime) > 220) {
+                            console.log('Step detected (mag=' + magnitude.toFixed(2) + ')');
+                            performStep();
+                            lastStepTime = now;
+                        }
+                    }
 
+                    isInGhostZone();
+                });
+            } else {
+                console.warn('DeviceMotionEvent not supported');
+            }
 
-            // initial
             isInGhostZone();
         }
 
@@ -780,12 +737,6 @@ if (window.DeviceOrientationEvent) {
             isInGhostZone();
         }
 
-        function rotatePlayer(deltaDeg) {
-            playerHeading = (playerHeading + deltaDeg + 360) % 360;
-            isInGhostZone();
-        }
-
-        // Timer functions
         function startTimer() {
             timerInterval = setInterval(updateTimer, 1000);
         }
@@ -803,7 +754,6 @@ if (window.DeviceOrientationEvent) {
             document.getElementById('timerDisplay').textContent = timeString;
         }
 
-        // Screen management
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.classList.remove('active');
@@ -812,23 +762,7 @@ if (window.DeviceOrientationEvent) {
             currentScreen = screenId;
         }
 
-       function openTool(toolName) {
-    if (toolName === 'emf') {
-        showScreen('emfScreen');
-
-        // try to start motion/orientation tracking as part of this user gesture
-        try {
-            startIndoorTracking();
-            console.log('Motion/orientation tracking started from EMF open');
-        } catch (e) {
-            console.warn('Could not start indoor tracking:', e);
-        }
-    }
-}
-
-
         function backToTools() {
-            // Stop EMF if running
             if (devicePowered) {
                 togglePower();
             }
@@ -837,14 +771,10 @@ if (window.DeviceOrientationEvent) {
 
         function endInvestigation() {
             if (confirm('Are you sure you want to end the current investigation?')) {
-                console.log('Ending investigation - clearing all data');
-
-                // Stop all systems
                 investigationActive = false;
                 devicePowered = false;
                 gameCode = '';
 
-                // Clear timers and intervals
                 if (timerInterval) {
                     clearInterval(timerInterval);
                     timerInterval = null;
@@ -857,29 +787,25 @@ if (window.DeviceOrientationEvent) {
 
                 stopEMFReadings();
 
-                // Reset location/ghost data
                 playerStartPos = null;
                 ghostLocation = null;
                 currentPosition = null;
                 playerHeading = 0;
                 stepCount = 0;
+                lastMotionTimestamp = null;
 
-                // Reset UI
                 document.getElementById('gameCodeInput').value = '';
                 showScreen('homeScreen');
 
-                // Reset EMF display
                 document.querySelector('.emf-value').textContent = '0.00';
                 document.getElementById('powerBtn').classList.remove('powered-on');
 
-                // Reset all LEDs
                 ['powerLed', 'calibLed', 'anomalyLed'].forEach(id => {
                     const led = document.getElementById(id);
                     led.className = 'status-led red';
                     led.style.opacity = '0.3';
                 });
 
-                // Clear debug display
                 document.getElementById('ghostX').textContent = '--';
                 document.getElementById('ghostY').textContent = '--';
                 document.getElementById('ghostFloor').textContent = '--';
@@ -890,12 +816,9 @@ if (window.DeviceOrientationEvent) {
                 document.getElementById('ghostDistance').textContent = '--';
                 document.getElementById('floorMatch').textContent = '--';
                 document.getElementById('inZone').textContent = 'NO';
-
-                console.log('Investigation ended - all data cleared');
             }
         }
 
-        // EMF Functions
         function createDialNumbers() {
             const dialNumbers = document.querySelector('.dial-numbers');
             for (let i = 0; i <= 10; i++) {
@@ -955,7 +878,6 @@ if (window.DeviceOrientationEvent) {
 
             if (isInGhostZone()) {
                 targetEMF = 4.8 + Math.random() * 0.4;
-
                 const anomalyLed = document.getElementById('anomalyLed');
                 anomalyLed.className = 'status-led red';
                 anomalyLed.style.opacity = '1';
@@ -963,7 +885,6 @@ if (window.DeviceOrientationEvent) {
                 const baseLevel = 0.5;
                 const variation = (Math.random() - 0.5) * 0.8;
                 targetEMF = Math.max(0.1, Math.min(1.0, baseLevel + variation));
-
                 const anomalyLed = document.getElementById('anomalyLed');
                 anomalyLed.className = 'status-led red';
                 anomalyLed.style.opacity = '0.3';
@@ -982,7 +903,6 @@ if (window.DeviceOrientationEvent) {
             }
 
             emfAnimationInterval = setInterval(generateEMFReading, 200);
-            console.log('EMF readings started');
         }
 
         function stopEMFReadings() {
@@ -997,8 +917,6 @@ if (window.DeviceOrientationEvent) {
             const anomalyLed = document.getElementById('anomalyLed');
             anomalyLed.className = 'status-led red';
             anomalyLed.style.opacity = '0.3';
-
-            console.log('EMF readings stopped');
         }
 
         function togglePower() {
@@ -1032,8 +950,6 @@ if (window.DeviceOrientationEvent) {
                 }, 500);
 
                 startEMFReadings();
-                console.log('EMF Device powered ON');
-
             } else {
                 powerBtn.classList.remove('powered-on');
                 powerLed.className = 'status-led red';
@@ -1042,14 +958,10 @@ if (window.DeviceOrientationEvent) {
                 calibLed.style.opacity = '0.3';
 
                 stopEMFReadings();
-                console.log('EMF Device powered OFF');
             }
         }
 
-        // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('PCB Investigation Kit initialized (indoor mode)');
-
             createDialNumbers();
             createScaleMarks();
 
