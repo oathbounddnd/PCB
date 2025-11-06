@@ -781,11 +781,20 @@ const onSameFloor = verticalDistance <= 1;
             currentScreen = screenId;
         }
 
-        function openTool(toolName) {
-            if (toolName === 'emf') {
-                showScreen('emfScreen');
-            }
+       function openTool(toolName) {
+    if (toolName === 'emf') {
+        showScreen('emfScreen');
+
+        // try to start motion/orientation tracking as part of this user gesture
+        try {
+            startIndoorTracking();
+            console.log('Motion/orientation tracking started from EMF open');
+        } catch (e) {
+            console.warn('Could not start indoor tracking:', e);
         }
+    }
+}
+
 
         function backToTools() {
             // Stop EMF if running
