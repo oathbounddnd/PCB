@@ -642,6 +642,7 @@
       <div class="emf-header" style="text-align:center; margin-bottom:15px;">
         <div style="font-size:22px; font-weight:bold; color:#a0a0a0;">SPIRIT CAMERA INTERFACE</div>
         <div style="font-size:11px; color:#707070; font-style:italic;">Paranormal Detection System | Est. Her Majesty's Service</div>
+        <div class="current-room">Current Room: <span id="spiritCamRoom">Living Room</span></div>
       </div>
       <div class="cam-status" id="camStatus">
         Initializing camera feed...
@@ -649,12 +650,13 @@
       <div class="camera-viewport">
         <video id="cameraFeed" class="camera-feed" autoplay muted playsinline></video>
         <div id="cameraOverlay" class="camera-overlay"></div>
+        <div id="flashlightIndicator" class="flashlight-indicator">NORMAL MODE</div>
       </div>
       <div class="cam-controls">
         <div class="cam-btn active" onclick="setCameraMode('normal')" id="btnNormal">NORMAL</div>
-        <div class="cam-btn" onclick="setCameraMode('nightvision')" id="btnNightvision">NIGHT</div>
+        <div class="cam-btn" onclick="setCameraMode('nightvision')" id="btnNightVision">NIGHT</div>
         <div class="cam-btn" onclick="setCameraMode('spirit')" id="btnSpirit">SPIRIT</div>
-        <div class="cam-btn" onclick="setCameraMode('uv')" id="btnUv">UV</div>
+        <div class="cam-btn" onclick="setCameraMode('uv')" id="btnUV">UV</div>
       </div>
     </div>
     <div class="room-nav" id="roomNavigationCam"></div>
@@ -876,7 +878,7 @@
     function normalizeRoomName(name) {
       if (!name) return '';
       let n = name.toLowerCase().replace(/\s+/g, '_');
-      if (n === 'dinning_room') n = 'dining_room';
+      // Keep dinning_room as is since that matches our room list
       return n;
     }
 
@@ -892,13 +894,14 @@
 
     async function loadGhostDataJSON(code) {
       try {
-        const response = await fetch(`./Games/${code}.json`);
-        if (!response.ok) throw new Error(`Ghost data Games/${code}.json not found`);
+        const response = await fetch(`./${code}.json`);
+        if (!response.ok) throw new Error(`Ghost data ${code}.json not found`);
         const ghostDataText = await response.text();
         const processedContent = processGhostDataSyntax(ghostDataText);
         const ghostData = JSON.parse(processedContent);
         return ghostData;
       } catch (error) {
+        console.log('Ghost data loading error:', error);
         return null;
       }
     }
@@ -1056,6 +1059,13 @@
       if (room === currentRoom) return;
       currentRoom = room;
       document.getElementById('currentRoomDisplay').textContent = currentRoom;
+      
+      // Update Spirit Cam room display if active
+      const spiritCamRoom = document.getElementById('spiritCamRoom');
+      if (spiritCamRoom) {
+        spiritCamRoom.textContent = currentRoom;
+      }
+      
       startRoomTimer();
       triggerGhostEvent('player_enters_room');
 
@@ -1126,7 +1136,7 @@
         triggerScreenShake();
       }
       if (event.audio) {
-        const audioPath = `./Games/Audio/${event.audio}`;
+        const audioPath = `./Audio/${event.audio}`;
         playGhostAudio(audioPath, event.volume || 'medium');
       }
     }
@@ -1159,11 +1169,11 @@
     function triggerDoorSlam() {
       triggerEMFSpike(4.2, 2);
       triggerScreenShake();
-      playGhostAudio('./Games/Audio/door_slam.mp3', 'loud');
+      playGhostAudio('./Audio/door_slam.mp3', 'loud');
     }
     function triggerDoorCreak() {
       triggerEMFSpike(2.8, 3);
-      playGhostAudio('./Games/Audio/door_creak.mp3', 'medium');
+      playGhostAudio('./Audio/door_creak.mp3', 'medium');
     }
     function triggerLightsFlicker() {
       const body = document.body;
@@ -1326,6 +1336,13 @@
         createRoomNavigation();
       } else if (name === 'spiritcam') {
         showScreen('spiritcamScreen');
+        
+        // Initialize Spirit Cam room display
+        const spiritCamRoom = document.getElementById('spiritCamRoom');
+        if (spiritCamRoom) {
+          spiritCamRoom.textContent = currentRoom;
+        }
+        
         createRoomNavigation('roomNavigationCam');
         initializeCamera();
       }
