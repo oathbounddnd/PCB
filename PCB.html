@@ -552,7 +552,7 @@
         </div>
     </div>
 
-    <!-- Debug Status (remove in production) -->
+    <!-- Debug Status -->
     <div class="ghost-status" id="ghostStatus">
         <div><strong>DEBUG MODE (INDOOR):</strong></div>
         <div><strong>Ghost Location:</strong></div>
@@ -590,11 +590,12 @@
         let playerStartPos = null;
         let ghostLocation = null;
         let currentPosition = null;
-        let playerHeading = 0; // degrees
+        let playerHeading = 0; // degrees (relative)
+        let headingBaseline = null; // first real reading
+        let useOrientation = false;
         let stepCount = 0;
         const STEP_LENGTH = 0.7;
         let lastStepTime = 0;
-        let lastMotionTimestamp = null; // for integrating rotation
 
         // Generate ghost 2–4m away
         function generateGhostLocation(startX, startY, startAlt) {
@@ -621,7 +622,7 @@
             const horizontalDistance = Math.sqrt(dx * dx + dy * dy);
 
             const verticalDistance = Math.abs((currentPosition.alt || 0) - ghostLocation.alt);
-            const DETECTION_RADIUS = 1.5; // tighten zone
+            const DETECTION_RADIUS = 1.5;
             const inHorizontalZone = horizontalDistance <= DETECTION_RADIUS;
             const onSameFloor = verticalDistance <= 1;
 
@@ -663,54 +664,64 @@
             showScreen('toolScreen');
             startTimer();
 
-            // we start sensors when user opens EMF
             isInGhostZone();
         }
 
-        // auto-start sensors when EMF is opened
         function openTool(toolName) {
             if (toolName === 'emf') {
                 showScreen('emfScreen');
-                try {
-                    startIndoorTracking();
-                    console.log('Indoor tracking started from EMF open');
-                } catch (e) {
-                    console.warn('Could not start tracking', e);
-                }
+                startIndoorTracking();
             }
         }
 
+        // relative orientation: first reading = north
+        function initOrientationListener() {
+            if (!window.DeviceOrientationEvent) return;
+
+            window.addEventListener('deviceorientation', function (event) {
+                if (typeof event.alpha !== 'number') return;
+
+                let raw = event.alpha; // 0–360 but weird on some phones
+
+                if (headingBaseline === null) {
+                    headingBaseline = raw;
+                    playerHeading = 0;
+                    useOrientation = true;
+                    isInGhostZone();
+                    return;
+                }
+
+                // difference from start
+                let delta = raw - headingBaseline;
+
+                // normalise to -180..180
+                if (delta > 180) delta -= 360;
+                if (delta < -180) delta += 360;
+
+                // exaggerate small device changes
+                delta = delta * 2;
+
+                playerHeading = (delta + 360) % 360;
+                isInGhostZone();
+            }, true);
+        }
+
         function startIndoorTracking() {
-            // Single devicemotion listener for BOTH steps and heading
+            // orientation first
+            initOrientationListener();
+
+            // step detection
             if (window.DeviceMotionEvent) {
                 window.addEventListener('devicemotion', function (event) {
                     const now = Date.now();
-                    let dt = 0;
-                    if (lastMotionTimestamp !== null) {
-                        dt = (now - lastMotionTimestamp) / 1000; // seconds
-                    }
-                    lastMotionTimestamp = now;
-
-                    // 1) integrate rotation → heading
-                    if (event.rotationRate && typeof event.rotationRate.alpha === 'number') {
-                        // alpha is rotation around Z (yaw) in deg/sec on many Androids
-                        const yawSpeed = event.rotationRate.alpha; // deg/sec
-                        if (!isNaN(yawSpeed) && dt > 0) {
-                            playerHeading = (playerHeading + yawSpeed * dt) % 360;
-                            if (playerHeading < 0) playerHeading += 360;
-                        }
-                    }
-
-                    // 2) detect step → move forward in heading
                     const acc = event.acceleration && (event.acceleration.x !== null)
                         ? event.acceleration
                         : event.accelerationIncludingGravity;
 
                     if (acc) {
                         const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-                        // more sensitive now
-                        if (magnitude > 4.5 && (now - lastStepTime) > 220) {
-                            console.log('Step detected (mag=' + magnitude.toFixed(2) + ')');
+                        // pretty sensitive
+                        if (magnitude > 3.8 && (now - lastStepTime) > 200) {
                             performStep();
                             lastStepTime = now;
                         }
@@ -718,8 +729,6 @@
 
                     isInGhostZone();
                 });
-            } else {
-                console.warn('DeviceMotionEvent not supported');
             }
 
             isInGhostZone();
@@ -728,9 +737,11 @@
         function performStep(customLength) {
             const len = customLength || STEP_LENGTH;
             const rad = (playerHeading - 90) * Math.PI / 180;
+
             if (!currentPosition) {
                 currentPosition = { x: 0, y: 0, alt: 0, floor: 'ground floor' };
             }
+
             currentPosition.x += Math.cos(rad) * len;
             currentPosition.y += Math.sin(rad) * len;
             stepCount++;
@@ -791,8 +802,10 @@
                 ghostLocation = null;
                 currentPosition = null;
                 playerHeading = 0;
+                headingBaseline = null;
+                useOrientation = false;
                 stepCount = 0;
-                lastMotionTimestamp = null;
+                lastStepTime = 0;
 
                 document.getElementById('gameCodeInput').value = '';
                 showScreen('homeScreen');
