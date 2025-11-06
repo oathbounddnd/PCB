@@ -655,7 +655,7 @@
       }
     };
 
-    // JSON Scenario Loading System
+    // JSON Scenario Loading System (Legacy - silent failure)
     async function loadScenarioJSON(code) {
       try {
         const response = await fetch(`./scenario_${code}.json`);
@@ -665,7 +665,7 @@
         const scenarioData = await response.json();
         return scenarioData;
       } catch (error) {
-        console.log(`Failed to load scenario_${code}.json, using embedded data:`, error);
+        // Silent failure - user is using new ghost data format
         return null;
       }
     }
@@ -1491,8 +1491,6 @@
         
         // Handle common room name mappings
         if (ghostRoom === 'Dining Room') ghostRoom = 'Dinning Room'; // Match typo in room list
-        
-        console.log(`Ghost location: ${rawRoom} -> ${ghostRoom}`);
       } else if (currentScenario) {
         ghostRoom = currentScenario.GHOST_INFO ? currentScenario.GHOST_INFO.location : currentScenario.room;
       }
