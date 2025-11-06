@@ -2,7 +2,7 @@
 {
   "ghost_info": {
     "id": "104",
-    "name": "male", 
+    "name": "male",
     "type": "spirit",
     "class": 3,
     "location": "dining_room",
@@ -11,33 +11,34 @@
   },
   "timeline": new Sequence()
     .effect("emf_spike")
-    .time(1)
-    .emf_spike(6)
-    .duration(10)
-    .audio("Poltergeist01.ogg")
-
-    .effect("ghost_orbs") 
-    .time(1) 
-
+      .time(1)
+      .emf_spike(6)
+      .duration(10)
+      .audio("Poltergeist01.ogg")
     .effect("emf_spike")
-    .time(12) 
-    .emf_spike(5.9)
-    .duration(5)
-    .audio("door_slam.mp3")
-
+      .time(7)
+      .emf_spike(5.6)
+      .duration(4)
+      .audio("chair_scrape.mp3")
     .effect("emf_spike")
-    .time(18)
-    .emf_spike(5.3) 
-    .duration(4)
-    .audio("heavy_breathing.mp3")
-
+      .time(12)
+      .emf_spike(5.9)
+      .duration(5)
+      .audio("door_slam.mp3")
     .effect("emf_spike")
-    .time(24)
-    .emf_spike(5.8)
-    .duration(6)
-    .audio("angry_voice.mp3"),
+      .time(18)
+      .emf_spike(5.3)
+      .duration(4)
+      .audio("heavy_breathing.mp3")
+    .effect("emf_spike")
+      .time(24)
+      .emf_spike(5.8)
+      .duration(6)
+      .audio("angry_voice.mp3")
+    /* show orbs once on the timeline too */
+    .effect("ghost_orbs")
+      .time(5),
   "triggers": {
-    
- 
+
   }
 }
