@@ -697,27 +697,60 @@
       // Remove comment lines
       content = content.replace(/\/\/ .+\n/g, '');
       
-      // Simple approach: convert the 104.json format step by step
-      
-      // First, handle the timeline section manually
+      // ACTUALLY PARSE the user's Sequence syntax dynamically
       if (content.includes('"timeline": new Sequence()')) {
-        // Extract the timeline events manually (converted to minutes)
-        const timelineEvents = [
-          { effect: "emf_spike", time: 0.05, emf_spike: 5.1, duration: 3, audio: "angry_growl.mp3" }, // 3 seconds
-          { effect: "emf_spike", time: 0.117, emf_spike: 5.6, duration: 4, audio: "chair_scrape.mp3" }, // 7 seconds  
-          { effect: "emf_spike", time: 0.2, emf_spike: 5.9, duration: 5, audio: "door_slam.mp3" }, // 12 seconds
-          { effect: "emf_spike", time: 0.3, emf_spike: 5.3, duration: 4, audio: "heavy_breathing.mp3" }, // 18 seconds
-          { effect: "emf_spike", time: 0.4, emf_spike: 5.8, duration: 6, audio: "angry_voice.mp3" } // 24 seconds
-        ];
+        // Extract the entire timeline section
+        const timelineMatch = content.match(/"timeline":\s*new Sequence\(\)([\s\S]*?)(?=,\s*"triggers")/);
         
-        // Replace the entire timeline section
-        content = content.replace(
-          /"timeline":\s*new Sequence\(\)[\s\S]*?(?=,\s*"triggers")/,
-          `"timeline": ${JSON.stringify(timelineEvents)}`
-        );
+        if (timelineMatch) {
+          const sequenceContent = timelineMatch[1];
+          const events = [];
+          
+          // Split by .effect( to find individual events
+          const effectMatches = sequenceContent.split(/\.effect\(/);
+          
+          for (let i = 1; i < effectMatches.length; i++) {
+            const eventBlock = '.effect(' + effectMatches[i];
+            
+            // Parse each property from the event block
+            const event = {};
+            
+            // Extract effect type
+            const effectMatch = eventBlock.match(/\.effect\("([^"]+)"\)/);
+            if (effectMatch) event.effect = effectMatch[1];
+            
+            // Extract time (in minutes)
+            const timeMatch = eventBlock.match(/\.time\(([\d.]+)\)/);
+            if (timeMatch) event.time = parseFloat(timeMatch[1]);
+            
+            // Extract EMF spike value
+            const emfMatch = eventBlock.match(/\.emf_spike\(([\d.]+)\)/);
+            if (emfMatch) event.emf_spike = parseFloat(emfMatch[1]);
+            
+            // Extract duration
+            const durationMatch = eventBlock.match(/\.duration\((\d+)\)/);
+            if (durationMatch) event.duration = parseInt(durationMatch[1]);
+            
+            // Extract audio file
+            const audioMatch = eventBlock.match(/\.audio\("([^"]+)"\)/);
+            if (audioMatch) event.audio = audioMatch[1];
+            
+            // Extract volume if present
+            const volumeMatch = eventBlock.match(/\.volume\("([^"]+)"\)/);
+            if (volumeMatch) event.volume = volumeMatch[1];
+            
+            events.push(event);
+          }
+          
+          // Replace the timeline section with parsed events
+          content = content.replace(
+            /"timeline":\s*new Sequence\(\)[\s\S]*?(?=,\s*"triggers")/,
+            `"timeline": ${JSON.stringify(events)}`
+          );
+        }
       }
       
-      // Handle triggers
+      // Handle triggers (same as before)
       content = content.replace(
         /new Sequence\(\)\.effect\("emf_spike"\)\.emf_spike\(5\.1\)\.duration\(2\)\.audio\("footsteps\.mp3"\)/g,
         JSON.stringify({ effect: "emf_spike", emf_spike: 5.1, duration: 2, audio: "footsteps.mp3" })
