@@ -894,8 +894,8 @@
 
     async function loadGhostDataJSON(code) {
       try {
-        const response = await fetch(`./${code}.json`);
-        if (!response.ok) throw new Error(`Ghost data ${code}.json not found`);
+        const response = await fetch(`./Games/${code}.json`);
+        if (!response.ok) throw new Error(`Ghost data Games/${code}.json not found`);
         const ghostDataText = await response.text();
         const processedContent = processGhostDataSyntax(ghostDataText);
         const ghostData = JSON.parse(processedContent);
@@ -1136,7 +1136,7 @@
         triggerScreenShake();
       }
       if (event.audio) {
-        const audioPath = `./Audio/${event.audio}`;
+        const audioPath = `./Games/Audio/${event.audio}`;
         playGhostAudio(audioPath, event.volume || 'medium');
       }
     }
@@ -1169,11 +1169,11 @@
     function triggerDoorSlam() {
       triggerEMFSpike(4.2, 2);
       triggerScreenShake();
-      playGhostAudio('./Audio/door_slam.mp3', 'loud');
+      playGhostAudio('./Games/Audio/door_slam.mp3', 'loud');
     }
     function triggerDoorCreak() {
       triggerEMFSpike(2.8, 3);
-      playGhostAudio('./Audio/door_creak.mp3', 'medium');
+      playGhostAudio('./Games/Audio/door_creak.mp3', 'medium');
     }
     function triggerLightsFlicker() {
       const body = document.body;
@@ -1285,6 +1285,7 @@
         errorElement.textContent = '❌ Error: No Rooms Selected';
         return;
       }
+      
       errorElement.style.display = 'block';
       errorElement.style.color = '#90EE90';
       errorElement.textContent = '📡 Loading scenario data...';
