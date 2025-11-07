@@ -839,6 +839,7 @@
     let timelineProcessingInterval = null;
     let orbVisibleDuration = 60000; // 1 minute visible
     let orbHiddenDuration = 60000; // 1 minute hidden (changed from 2 minutes)
+    let orbsReadyToShow = false; // Track if orbs should be showing
 
     function startGhostOrbs() {
       if (ghostOrbsActive) return;
@@ -918,8 +919,10 @@
       const h = viewport.clientHeight;
       
       // Spawn across ENTIRE screen
-      const x = Math.random() * (w - size);
-      const y = Math.random() * (h - size);
+      const roomX = Math.random() * (w - size);
+      const roomY = Math.random() * (h - size);
+      
+      console.log(`Creating orb at room position: ${roomX}, ${roomY} (viewport: ${w}x${h})`);
       
       const baseSpeed = 6 + Math.random() * 8;
       const angle = Math.random() * Math.PI * 2;
@@ -933,9 +936,6 @@
       
       const orb = {
         el,
-        // Current screen position
-        x: x,
-        y: y,
         size,
         vx: Math.cos(angle) * baseSpeed,
         vy: Math.sin(angle) * baseSpeed,
@@ -945,21 +945,29 @@
         lifespan: 5 + Math.random() * 5, // 5-10 seconds lifespan
         age: 0,
         // Fixed room position - where this orb exists in the room
-        roomX: x,
-        roomY: y
+        roomX: roomX,
+        roomY: roomY
       };
       
-      el.style.transform = `translate(${x}px, ${y}px)`;
+      // Initial positioning
+      const initialX = roomX + worldOffsetX;
+      const initialY = roomY + worldOffsetY;
+      el.style.transform = `translate(${initialX}px, ${initialY}px)`;
+      console.log(`Initial orb screen position: ${initialX}, ${initialY} (worldOffset: ${worldOffsetX}, ${worldOffsetY})`);
+      
       viewport.appendChild(el);
       currentOrbs.push(orb);
-      
-      console.log('Created orb at:', x, y);
     }
     let lastOrbTime = performance.now();
     function orbsTick(now) {
       const dt = Math.min((now - lastOrbTime) / 1000, 0.05);
       lastOrbTime = now;
-      if (ghostOrbsActive) {
+      if (ghostOrbsActive && currentOrbs.length > 0) {
+        // Debug: Log world offset occasionally
+        if (Math.random() < 0.01) { // 1% chance each frame
+          console.log(`Orb tick - worldOffset: ${worldOffsetX}, ${worldOffsetY}, orb count: ${currentOrbs.length}`);
+        }
+        
         // Update orbs and remove expired ones
         for (let i = currentOrbs.length - 1; i >= 0; i--) {
           const orb = currentOrbs[i];
@@ -1342,18 +1350,26 @@
         }
       }
       if (event.effect === 'ghost_orbs') {
-        // Only start orbs if player is in ghost room AND using Spirit Cam
+        // Orbs appear if player is in ghost room, regardless of current tool
         const ghostRoom = normalizeRoomName(currentGhostData?.ghost_info?.location);
         const playerRoom = normalizeRoomName(currentRoom);
-        if (playerRoom === ghostRoom && currentScreen === 'spiritcamScreen') {
+        if (playerRoom === ghostRoom) {
+          console.log('Ghost orbs triggered - player in ghost room');
           // Process orb settings from event if provided
           if (event.visible_duration) orbVisibleDuration = event.visible_duration * 60 * 1000;
           if (event.hidden_duration) orbHiddenDuration = event.hidden_duration * 60 * 1000; 
           if (event.max_orbs) maxOrbs = event.max_orbs;
           
-          startGhostOrbs();
+          // Orbs are only VISIBLE when Spirit Cam is open, but they start when timeline triggers
+          orbsReadyToShow = true;
+          
+          if (currentScreen === 'spiritcamScreen') {
+            startGhostOrbs();
+          } else {
+            console.log('Orbs ready - will show when Spirit Cam opens');
+          }
         } else {
-          console.log(`Ghost orbs event triggered but conditions not met. Player room: ${playerRoom}, Ghost room: ${ghostRoom}, Screen: ${currentScreen}`);
+          console.log(`Ghost orbs event triggered but player not in ghost room. Player room: ${playerRoom}, Ghost room: ${ghostRoom}`);
         }
       }
       if (event.effect === 'door_slam') {
@@ -1467,13 +1483,21 @@
         videoElement.srcObject = cameraStream;
         statusElement.textContent = 'Camera active - Scanning for paranormal activity...';
         
-        // DON'T auto-start orbs - wait for timeline events
+        // Check if orbs are ready to show
+        if (orbsReadyToShow) {
+          console.log('Spirit Cam opened - starting orbs that were waiting');
+          startGhostOrbs();
+        }
         
       } catch (error) {
         statusElement.textContent = 'Camera access denied - Using simulated feed';
         videoElement.style.background = 'linear-gradient(45deg, #1a1a1a, #2a2a2a)';
         
-        // DON'T auto-start orbs - wait for timeline events
+        // Check if orbs are ready to show even without camera
+        if (orbsReadyToShow) {
+          console.log('Spirit Cam opened (simulated) - starting orbs that were waiting');
+          startGhostOrbs();
+        }
       }
     }
 
@@ -1632,6 +1656,7 @@
       roomReadyForReadings = false;
       currentGhostRoom = null;
       currentGhostData = null;
+      orbsReadyToShow = false; // Reset orbs ready flag
       if (roomTimerInterval) clearInterval(roomTimerInterval);
       if (evidenceTimer) clearTimeout(evidenceTimer);
       if (eventProcessingInterval) clearInterval(eventProcessingInterval);
