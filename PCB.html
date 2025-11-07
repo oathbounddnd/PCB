@@ -313,13 +313,65 @@
       position: absolute;
       border-radius: 50%;
       pointer-events: none;
-      background: radial-gradient(circle,
-        rgba(200, 220, 255, 0.25) 0%,
-        rgba(200, 220, 255, 0.05) 55%,
-        rgba(200, 220, 255, 0) 70%);
-      filter: blur(0.8px);
+      background: radial-gradient(circle at 30% 30%, 
+        rgba(255, 255, 255, 0.9) 0%, 
+        rgba(255, 255, 255, 0.5) 40%, 
+        rgba(255, 255, 255, 0.1) 70%,
+        rgba(255, 255, 255, 0) 100%);
+      box-shadow: 
+        0 0 20px rgba(255, 255, 255, 0.8),
+        0 0 40px rgba(255, 255, 255, 0.4);
+      filter: blur(1.5px);
       mix-blend-mode: screen;
       z-index: 4;
+      animation: orbFloat 3s infinite ease-in-out;
+    }
+    
+    .ghost-orb.spirit-mode {
+      background: radial-gradient(circle at 30% 30%, 
+        rgba(255, 255, 255, 1.0) 0%, 
+        rgba(255, 255, 255, 0.8) 40%, 
+        rgba(255, 255, 255, 0.3) 70%,
+        rgba(255, 255, 255, 0) 100%);
+      box-shadow: 
+        0 0 30px rgba(255, 255, 255, 1.0),
+        0 0 50px rgba(255, 255, 255, 0.6);
+      filter: blur(1px);
+    }
+    
+    .ghost-orb.nightvision-mode {
+      background: radial-gradient(circle at 30% 30%, 
+        rgba(144, 238, 144, 0.95) 0%, 
+        rgba(144, 238, 144, 0.6) 40%, 
+        rgba(144, 238, 144, 0.2) 70%,
+        rgba(144, 238, 144, 0) 100%);
+      box-shadow: 
+        0 0 25px rgba(144, 238, 144, 0.9),
+        0 0 45px rgba(144, 238, 144, 0.5);
+      filter: blur(1.2px);
+    }
+    
+    @keyframes orbFloat {
+      0% { 
+        transform: scale(1) rotate(0deg); 
+        opacity: var(--orb-opacity, 1);
+      }
+      25% { 
+        transform: scale(1.1) rotate(90deg); 
+        opacity: calc(var(--orb-opacity, 1) * 0.8);
+      }
+      50% { 
+        transform: scale(0.9) rotate(180deg); 
+        opacity: var(--orb-opacity, 1);
+      }
+      75% { 
+        transform: scale(1.05) rotate(270deg); 
+        opacity: calc(var(--orb-opacity, 1) * 0.9);
+      }
+      100% { 
+        transform: scale(1) rotate(360deg); 
+        opacity: var(--orb-opacity, 1);
+      }
     }
 
     .tools-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; max-width:400px; }
@@ -366,8 +418,8 @@
     .power-button { cursor:pointer; padding:4px 8px; border:1px solid #888; border-radius:3px; font-size: 11px; }
     .main-display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .emf-meter {
-      width: 400px; 
-      height: 200px; 
+      width: 450px; 
+      height: 225px; 
       position: relative; 
       margin-bottom: 20px;
       background-image: url('./Dial.png');
@@ -414,7 +466,7 @@
       width:100%; height:100%;
     }
     .needle {
-      position:absolute; top:50%; left:50%; width:3px; height:80px;
+      position:absolute; top:50%; left:50%; width:3px; height:90px;
       background: linear-gradient(to top, #ff6666, #ffaaaa);
       transform-origin:bottom center;
       transform:translate(-50%, -50%) rotate(-90deg);
@@ -855,15 +907,29 @@
     function createInsectOrb(viewport) {
       const el = document.createElement('div');
       el.className = 'ghost-orb';
-      const size = 4 + Math.random() * 6;
+      
+      // Make orbs bigger - 8px to 16px instead of 4px to 10px
+      const size = 8 + Math.random() * 8; 
       el.style.width = size + 'px';
       el.style.height = size + 'px';
+      
       const w = viewport.clientWidth;
       const h = viewport.clientHeight;
-      const x = Math.random() * w;
-      const y = Math.random() * h;
-      const baseSpeed = 8 + Math.random() * 12;
+      
+      // Spawn across ENTIRE screen, not just edges
+      const x = Math.random() * (w - size);
+      const y = Math.random() * (h - size);
+      
+      const baseSpeed = 6 + Math.random() * 8; // Slightly slower movement
       const angle = Math.random() * Math.PI * 2;
+      
+      // Apply camera mode styling
+      if (cameraMode === 'spirit') {
+        el.classList.add('spirit-mode');
+      } else if (cameraMode === 'nightvision') {
+        el.classList.add('nightvision-mode');
+      }
+      
       const orb = {
         el,
         x,
@@ -874,9 +940,13 @@
         baseSpeed,
         wanderTimer: 0.2 + Math.random() * 0.8,
         viewport,
-        lifespan: 10, // 10 second lifespan
-        age: 0 // Track how old this orb is
+        lifespan: 5 + Math.random() * 5, // 5-10 seconds lifespan
+        age: 0,
+        // Fixed world position - these don't change with camera movement
+        worldX: x,
+        worldY: y
       };
+      
       el.style.transform = `translate(${x}px, ${y}px)`;
       viewport.appendChild(el);
       currentOrbs.push(orb);
@@ -925,17 +995,22 @@
             orb.vy = Math.sin(newAngle) * newSpeed;
           }
 
-          orb.x += orb.vx * dt;
-          orb.y += orb.vy * dt;
+          // Update world position (orb moves through world)
+          orb.worldX += orb.vx * dt;
+          orb.worldY += orb.vy * dt;
 
-          if (orb.x < -20) orb.x = w + 20;
-          if (orb.x > w + 20) orb.x = -20;
-          if (orb.y < -20) orb.y = h + 20;
-          if (orb.y > h + 20) orb.y = -20;
+          // Wrap around world edges
+          if (orb.worldX < -50) orb.worldX = w + 50;
+          if (orb.worldX > w + 50) orb.worldX = -50;
+          if (orb.worldY < -50) orb.worldY = h + 50;
+          if (orb.worldY > h + 50) orb.worldY = -50;
 
-          const drawX = orb.x + worldOffsetX;
-          const drawY = orb.y + worldOffsetY;
-          orb.el.style.transform = `translate(${drawX}px, ${drawY}px)`;
+          // Calculate screen position: world position MINUS camera offset
+          // This makes orbs appear to stay in place when camera moves
+          const screenX = orb.worldX - worldOffsetX;
+          const screenY = orb.worldY - worldOffsetY;
+          
+          orb.el.style.transform = `translate(${screenX}px, ${screenY}px)`;
         }
       }
       requestAnimationFrame(orbsTick);
@@ -1249,7 +1324,10 @@
       const ghostRoom = normalizeRoomName(currentGhostData?.ghost_info?.location);
       const playerRoom = normalizeRoomName(currentRoom);
       if (event.effect === 'emf_spike' && event.emf_spike) {
-        if (devicePowered) triggerEMFSpike(event.emf_spike, event.duration || 3);
+        if (devicePowered) {
+          console.log(`EMF spike: ${event.emf_spike} for ${event.duration || 3} seconds`);
+          triggerEMFSpike(event.emf_spike, event.duration || 3);
+        }
       }
       if (event.effect === 'ghost_orbs') {
         // Only start orbs if player is in ghost room AND using Spirit Cam
@@ -1281,15 +1359,30 @@
 
     function playGhostAudio(audioPath, volume = 'medium') {
       try {
+        console.log('Attempting to play audio:', audioPath);
         const audio = new Audio(audioPath);
+        audio.addEventListener('loadeddata', () => {
+          console.log('Audio loaded successfully:', audioPath);
+        });
+        audio.addEventListener('error', (e) => {
+          console.log('Audio failed to load:', audioPath, e);
+        });
+        
         switch(volume.toLowerCase()) {
           case 'quiet': audio.volume = 0.3; break;
           case 'medium': audio.volume = 0.6; break;
           case 'loud': audio.volume = 0.9; break;
           default: audio.volume = 0.6;
         }
-        audio.play().catch(()=>{});
-      } catch (e) {}
+        
+        audio.play().then(() => {
+          console.log('Audio playing:', audioPath);
+        }).catch((e) => {
+          console.log('Audio play failed:', audioPath, e);
+        });
+      } catch (e) {
+        console.log('Audio error:', e);
+      }
     }
 
     function triggerEMFSpike(value, duration = 3) {
