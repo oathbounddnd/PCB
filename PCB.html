@@ -314,13 +314,13 @@
       border-radius: 50%;
       pointer-events: none;
       background: radial-gradient(circle at 30% 30%, 
-        rgba(255, 255, 255, 0.9) 0%, 
-        rgba(255, 255, 255, 0.5) 40%, 
-        rgba(255, 255, 255, 0.1) 70%,
+        rgba(255, 255, 255, 0.4) 0%, 
+        rgba(255, 255, 255, 0.2) 40%, 
+        rgba(255, 255, 255, 0.05) 70%,
         rgba(255, 255, 255, 0) 100%);
       box-shadow: 
-        0 0 20px rgba(255, 255, 255, 0.8),
-        0 0 40px rgba(255, 255, 255, 0.4);
+        0 0 12px rgba(255, 255, 255, 0.3),
+        0 0 24px rgba(255, 255, 255, 0.1);
       filter: blur(1.5px);
       mix-blend-mode: screen;
       z-index: 4;
@@ -329,25 +329,25 @@
     
     .ghost-orb.spirit-mode {
       background: radial-gradient(circle at 30% 30%, 
-        rgba(255, 255, 255, 1.0) 0%, 
-        rgba(255, 255, 255, 0.8) 40%, 
-        rgba(255, 255, 255, 0.3) 70%,
+        rgba(255, 255, 255, 0.7) 0%, 
+        rgba(255, 255, 255, 0.4) 40%, 
+        rgba(255, 255, 255, 0.1) 70%,
         rgba(255, 255, 255, 0) 100%);
       box-shadow: 
-        0 0 30px rgba(255, 255, 255, 1.0),
-        0 0 50px rgba(255, 255, 255, 0.6);
+        0 0 18px rgba(255, 255, 255, 0.5),
+        0 0 30px rgba(255, 255, 255, 0.2);
       filter: blur(1px);
     }
     
     .ghost-orb.nightvision-mode {
       background: radial-gradient(circle at 30% 30%, 
-        rgba(144, 238, 144, 0.95) 0%, 
-        rgba(144, 238, 144, 0.6) 40%, 
-        rgba(144, 238, 144, 0.2) 70%,
+        rgba(144, 238, 144, 0.6) 0%, 
+        rgba(144, 238, 144, 0.3) 40%, 
+        rgba(144, 238, 144, 0.08) 70%,
         rgba(144, 238, 144, 0) 100%);
       box-shadow: 
-        0 0 25px rgba(144, 238, 144, 0.9),
-        0 0 45px rgba(144, 238, 144, 0.5);
+        0 0 15px rgba(144, 238, 144, 0.4),
+        0 0 25px rgba(144, 238, 144, 0.2);
       filter: blur(1.2px);
     }
     
@@ -802,6 +802,7 @@
     let devicePowered = false;
     let emfAnimationInterval = null;
     let currentEMF = 0.0;
+    let emfInSpike = false; // Flag to prevent normal generation during spikes
     let emfAngleMin = -90;
     let emfAngleMax = 30;
     let audioContext = null;
@@ -916,11 +917,11 @@
       const w = viewport.clientWidth;
       const h = viewport.clientHeight;
       
-      // Spawn across ENTIRE screen, not just edges
+      // Spawn across ENTIRE screen
       const x = Math.random() * (w - size);
       const y = Math.random() * (h - size);
       
-      const baseSpeed = 6 + Math.random() * 8; // Slightly slower movement
+      const baseSpeed = 6 + Math.random() * 8;
       const angle = Math.random() * Math.PI * 2;
       
       // Apply camera mode styling
@@ -932,8 +933,9 @@
       
       const orb = {
         el,
-        x,
-        y,
+        // Current screen position
+        x: x,
+        y: y,
         size,
         vx: Math.cos(angle) * baseSpeed,
         vy: Math.sin(angle) * baseSpeed,
@@ -942,14 +944,16 @@
         viewport,
         lifespan: 5 + Math.random() * 5, // 5-10 seconds lifespan
         age: 0,
-        // Fixed world position - these don't change with camera movement
-        worldX: x,
-        worldY: y
+        // Fixed room position - where this orb exists in the room
+        roomX: x,
+        roomY: y
       };
       
       el.style.transform = `translate(${x}px, ${y}px)`;
       viewport.appendChild(el);
       currentOrbs.push(orb);
+      
+      console.log('Created orb at:', x, y);
     }
     let lastOrbTime = performance.now();
     function orbsTick(now) {
@@ -973,7 +977,7 @@
           }
           
           // Fade out orb as it ages
-          const fadeStart = orb.lifespan * 0.7; // Start fading at 70% of lifespan
+          const fadeStart = orb.lifespan * 0.7;
           if (orb.age > fadeStart) {
             const fadeProgress = (orb.age - fadeStart) / (orb.lifespan - fadeStart);
             orb.el.style.opacity = 1 - fadeProgress;
@@ -983,6 +987,7 @@
           const w = viewport.clientWidth;
           const h = viewport.clientHeight;
 
+          // Update wandering behavior
           orb.wanderTimer -= dt;
           if (orb.wanderTimer <= 0) {
             orb.wanderTimer = 0.5 + Math.random();
@@ -995,20 +1000,20 @@
             orb.vy = Math.sin(newAngle) * newSpeed;
           }
 
-          // Update world position (orb moves through world)
-          orb.worldX += orb.vx * dt;
-          orb.worldY += orb.vy * dt;
+          // Update room position (where orb actually is in the room)
+          orb.roomX += orb.vx * dt;
+          orb.roomY += orb.vy * dt;
 
-          // Wrap around world edges
-          if (orb.worldX < -50) orb.worldX = w + 50;
-          if (orb.worldX > w + 50) orb.worldX = -50;
-          if (orb.worldY < -50) orb.worldY = h + 50;
-          if (orb.worldY > h + 50) orb.worldY = -50;
+          // Wrap around room edges
+          if (orb.roomX < -50) orb.roomX = w + 50;
+          if (orb.roomX > w + 50) orb.roomX = -50;
+          if (orb.roomY < -50) orb.roomY = h + 50;
+          if (orb.roomY > h + 50) orb.roomY = -50;
 
-          // Calculate screen position: world position MINUS camera offset
-          // This makes orbs appear to stay in place when camera moves
-          const screenX = orb.worldX - worldOffsetX;
-          const screenY = orb.worldY - worldOffsetY;
+          // Calculate screen position: room position + camera movement
+          // When camera moves right (positive worldOffsetX), orbs appear to move left
+          const screenX = orb.roomX + worldOffsetX;
+          const screenY = orb.roomY + worldOffsetY;
           
           orb.el.style.transform = `translate(${screenX}px, ${screenY}px)`;
         }
@@ -1321,12 +1326,19 @@
     }
 
     function executeGhostEvent(event) {
+      console.log('Executing ghost event:', event);
+      
       const ghostRoom = normalizeRoomName(currentGhostData?.ghost_info?.location);
       const playerRoom = normalizeRoomName(currentRoom);
+      
+      console.log(`Player in ${playerRoom}, Ghost in ${ghostRoom}, EMF powered: ${devicePowered}`);
+      
       if (event.effect === 'emf_spike' && event.emf_spike) {
         if (devicePowered) {
           console.log(`EMF spike: ${event.emf_spike} for ${event.duration || 3} seconds`);
           triggerEMFSpike(event.emf_spike, event.duration || 3);
+        } else {
+          console.log('EMF spike event triggered but EMF device not powered!');
         }
       }
       if (event.effect === 'ghost_orbs') {
@@ -1340,6 +1352,8 @@
           if (event.max_orbs) maxOrbs = event.max_orbs;
           
           startGhostOrbs();
+        } else {
+          console.log(`Ghost orbs event triggered but conditions not met. Player room: ${playerRoom}, Ghost room: ${ghostRoom}, Screen: ${currentScreen}`);
         }
       }
       if (event.effect === 'door_slam') {
@@ -1353,6 +1367,7 @@
       }
       if (event.audio) {
         const audioPath = `./Games/Audio/${event.audio}`;
+        console.log('Playing event audio:', audioPath);
         playGhostAudio(audioPath, event.volume || 'medium');
       }
     }
@@ -1386,12 +1401,22 @@
     }
 
     function triggerEMFSpike(value, duration = 3) {
-      if (!devicePowered) return;
+      if (!devicePowered) {
+        console.log('EMF spike attempted but device not powered');
+        return;
+      }
+      
+      console.log(`EMF SPIKE: Setting to ${value} for ${duration} seconds`);
+      
       const originalEMF = currentEMF;
+      emfInSpike = true; // Block normal EMF generation
       currentEMF = value;
       updateEMFDisplay(currentEMF);
       document.getElementById('anomalyLed').classList.add('on');
+      
       setTimeout(() => {
+        console.log(`EMF SPIKE ENDING: Returning to ${originalEMF}`);
+        emfInSpike = false; // Allow normal EMF generation
         currentEMF = originalEMF;
         updateEMFDisplay(currentEMF);
         document.getElementById('anomalyLed').classList.remove('on');
@@ -1720,7 +1745,7 @@
     }
 
     function generateEMFReading() {
-      if (!devicePowered) return;
+      if (!devicePowered || emfInSpike) return; // Don't generate if in spike
       // Natural baseline fluctuation between 0.0 and 1.1
       let target = Math.random() * 1.1; // 0.0 to 1.1
       currentEMF += (target - currentEMF) * 0.1;
