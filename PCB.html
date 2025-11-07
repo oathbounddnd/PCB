@@ -366,7 +366,10 @@
     .power-button { cursor:pointer; padding:4px 8px; border:1px solid #888; border-radius:3px; font-size: 11px; }
     .main-display { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .emf-meter {
-      width:300px; height:150px; position:relative; margin-bottom:15px;
+      width: 400px; 
+      height: 200px; 
+      position: relative; 
+      margin-bottom: 20px;
       background-image: url('./Dial.png');
       background-size: contain;
       background-repeat: no-repeat;
@@ -411,13 +414,13 @@
       width:100%; height:100%;
     }
     .needle {
-      position:absolute; top:50%; left:50%; width:4px; height:120px;
+      position:absolute; top:50%; left:50%; width:3px; height:80px;
       background: linear-gradient(to top, #ff6666, #ffaaaa);
       transform-origin:bottom center;
       transform:translate(-50%, -50%) rotate(-90deg);
       transition:transform .4s ease-out;
       border-radius: 2px;
-      box-shadow: 0 0 8px rgba(255,102,102,0.6);
+      box-shadow: 0 0 6px rgba(255,102,102,0.6);
       z-index: 10;
     }
     .needle-center { 
@@ -776,25 +779,59 @@
     let worldOffsetX = 0;
     let worldOffsetY = 0;
     const ORB_PARALLAX = 20;
+    
+    // ===== TIMELINE PROCESSING =====
+    let gameStartTime = 0;
+    let processedTimelineEvents = new Set();
+    let timelineProcessingInterval = null;
+    let orbVisibleDuration = 60000; // 1 minute visible
+    let orbHiddenDuration = 60000; // 1 minute hidden (changed from 2 minutes)
 
     function startGhostOrbs() {
       if (ghostOrbsActive) return;
       ghostOrbsActive = true;
       orbsVisibilityState = true;
-      spawnOrbsInViewport(2); // Start with 2 orbs instead of 5
-      orbsLoop = setInterval(() => {
-        if (!ghostOrbsActive) return;
-        // Only spawn if under max limit
-        if (currentOrbs.length < maxOrbs) {
-          spawnOrbsInViewport(1); // Spawn just 1 new orb at a time
-        }
-      }, 6000); // Every 6 seconds instead of 4
+      
+      console.log('Starting ghost orbs with cycling system');
+      
+      // Start with orbs visible
+      spawnOrbsInViewport(2);
+      
+      // Start the visibility cycling loop
+      startOrbsVisibilityCycle();
+    }
+    
+    function startOrbsVisibilityCycle() {
+      if (orbsLoop) clearTimeout(orbsLoop);
+      
+      if (orbsVisibilityState) {
+        // Currently visible → hide after visible duration
+        orbsLoop = setTimeout(() => {
+          if (!ghostOrbsActive) return;
+          
+          console.log('Hiding orbs for', orbHiddenDuration / 1000, 'seconds');
+          orbsVisibilityState = false;
+          clearAllOrbs(); // Hide all orbs
+          startOrbsVisibilityCycle(); // Continue the cycle
+        }, orbVisibleDuration);
+      } else {
+        // Currently hidden → show after hidden duration  
+        orbsLoop = setTimeout(() => {
+          if (!ghostOrbsActive) return;
+          
+          console.log('Showing orbs for', orbVisibleDuration / 1000, 'seconds');
+          orbsVisibilityState = true;
+          spawnOrbsInViewport(2); // Show new orbs
+          startOrbsVisibilityCycle(); // Continue the cycle
+        }, orbHiddenDuration);
+      }
     }
     function stopGhostOrbs() {
+      console.log('Stopping ghost orbs');
       ghostOrbsActive = false;
       orbsVisibilityState = false;
       if (orbsLoop) {
-        clearInterval(orbsLoop);
+        clearTimeout(orbsLoop);
         orbsLoop = null;
       }
       clearAllOrbs();
@@ -904,6 +941,36 @@
       requestAnimationFrame(orbsTick);
     }
     requestAnimationFrame(orbsTick);
+
+    // ===== TIMELINE PROCESSING SYSTEM =====
+    function startTimelineProcessing() {
+      if (timelineProcessingInterval) clearInterval(timelineProcessingInterval);
+      
+      timelineProcessingInterval = setInterval(() => {
+        if (!currentGhostData || !currentGhostData.timeline || !investigationActive) return;
+        
+        const currentGameTime = (Date.now() - gameStartTime) / 1000 / 60; // Game time in minutes
+        
+        currentGhostData.timeline.forEach((event, index) => {
+          const eventKey = `${index}-${event.time}-${event.effect}`;
+          
+          // If event time has passed and we haven't processed it yet
+          if (currentGameTime >= event.time && !processedTimelineEvents.has(eventKey)) {
+            console.log(`Timeline event triggered: ${event.effect} at ${event.time} minutes`);
+            processedTimelineEvents.add(eventKey);
+            executeGhostEvent(event);
+          }
+        });
+      }, 1000); // Check every second
+    }
+    
+    function stopTimelineProcessing() {
+      if (timelineProcessingInterval) {
+        clearInterval(timelineProcessingInterval);
+        timelineProcessingInterval = null;
+      }
+      processedTimelineEvents.clear();
+    }
 
     // parallax
     if (window.DeviceOrientationEvent) {
@@ -1393,6 +1460,12 @@
       gameCode = code;
       investigationActive = true;
       startTime = Date.now();
+      
+      // Initialize timeline processing
+      gameStartTime = Date.now();
+      processedTimelineEvents = new Set();
+      startTimelineProcessing();
+      
       startRoomTimer();
       showScreen('toolScreen');
       createRoomNavigation();
@@ -1445,6 +1518,10 @@
       if (evidenceTimer) clearTimeout(evidenceTimer);
       if (eventProcessingInterval) clearInterval(eventProcessingInterval);
       if (timerInterval) clearInterval(timerInterval);
+      
+      // Clean up timeline processing
+      stopTimelineProcessing();
+      
       cleanupSpiritCam();
       stopEMFReadings();
       document.getElementById('timerOverlay').classList.remove('active');
