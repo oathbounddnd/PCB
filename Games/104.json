@@ -19,17 +19,23 @@
     },
     {
       "effect": "emf_spike",
-      "time": 1,
+      "time": 0.5,
       "emf_spike": 6,
-      "duration": 10,
+      "duration": 6,
       "audio": "Poltergeist01.ogg"
     },
     {
-      "effect": "emf_spike",
-      "time": 7,
-      "emf_spike": 5.6,
-      "duration": 4,
-      "audio": "chair_scrape.mp3"
+      "effect": "sighting",
+      "time": 0.5,
+      "image": 01.png,
+      "fade": true,
+  "rush": true,
+  "size": "120px",
+  "duration": 5000,
+  "fade_delay": 1500,
+  "rush_delay": 1000,
+  "audio": "Poltergeist02.mp3",
+  "volume": "medium"
     },
     {
       "effect": "emf_spike",
