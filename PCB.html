@@ -233,23 +233,23 @@
       position: relative;
     }
     
-    /* Spirit Orb Styles */
+    /* Spirit Orb Styles - Small, fuzzy, transparent */
     .spirit-orb {
       position: absolute;
       border-radius: 50%;
       pointer-events: none;
       background: radial-gradient(circle,
-        rgba(200, 220, 255, 0.35) 0%,
-        rgba(200, 220, 255, 0.15) 55%,
+        rgba(200, 220, 255, 0.2) 0%,
+        rgba(200, 220, 255, 0.1) 55%,
         rgba(200, 220, 255, 0) 70%);
-      filter: blur(1px);
+      filter: blur(2px);
       mix-blend-mode: screen;
       opacity: 0;
       transition: opacity 0.3s ease;
       z-index: 5;
     }
     .spirit-orb.visible {
-      opacity: 1;
+      opacity: 0.4;
     }
     .camera-viewport {
       flex: 1;
@@ -343,7 +343,6 @@
       filter: blur(1.5px);
       mix-blend-mode: screen;
       z-index: 4;
-      animation: orbFloat 3s infinite ease-in-out;
     }
     
     .ghost-orb.spirit-mode {
@@ -370,29 +369,6 @@
       filter: blur(1.2px);
     }
     
-    @keyframes orbFloat {
-      0% { 
-        transform: scale(1) rotate(0deg); 
-        opacity: var(--orb-opacity, 1);
-      }
-      25% { 
-        transform: scale(1.1) rotate(90deg); 
-        opacity: calc(var(--orb-opacity, 1) * 0.8);
-      }
-      50% { 
-        transform: scale(0.9) rotate(180deg); 
-        opacity: var(--orb-opacity, 1);
-      }
-      75% { 
-        transform: scale(1.05) rotate(270deg); 
-        opacity: calc(var(--orb-opacity, 1) * 0.9);
-      }
-      100% { 
-        transform: scale(1) rotate(360deg); 
-        opacity: var(--orb-opacity, 1);
-      }
-    }
-
     .tools-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; max-width:400px; }
     .tool-btn {
       padding:30px 20px; background:linear-gradient(145deg, #383838, #2a2a2a);
@@ -842,233 +818,64 @@
     let cameraMode = 'normal';
     let flashlightOn = false;
 
-    // ===== CAMERA MOTION DETECTION ORBS =====
+    // ===== SIMPLE FLOATING OVERLAY ORBS =====
     let ghostOrbsActive = false;
     let orbsVisibilityState = false;
-    let currentOrbs = [];
+    let currentOrb = null;
     let orbsLoop = null;
-    let maxOrbs = 3;
-    
-    // Camera motion detection
-    let motionCanvas = null;
-    let motionContext = null;
-    let previousFrame = null;
-    let currentDirection = 'center';
-    let motionDetectionInterval = null;
-    
-    // Motion sensitivity
-    const MOTION_THRESHOLD = 20; // Minimum pixel change to register movement
-    const DIRECTION_THRESHOLD = 50; // Minimum directional bias to change direction
-    
-    // Screen zones for orbs (fixed positions)
-    const SCREEN_ZONES = {
-      'up': { x: 0.5, y: 0.15, name: 'ceiling' },
-      'down': { x: 0.5, y: 0.85, name: 'floor' },
-      'left': { x: 0.15, y: 0.5, name: 'left_wall' },
-      'right': { x: 0.85, y: 0.5, name: 'right_wall' },
-      'center': { x: 0.5, y: 0.5, name: 'front_wall' },
-      'up_left': { x: 0.25, y: 0.25, name: 'ceiling_left' },
-      'up_right': { x: 0.75, y: 0.25, name: 'ceiling_right' },
-      'down_left': { x: 0.25, y: 0.75, name: 'floor_left' },
-      'down_right': { x: 0.75, y: 0.75, name: 'floor_right' }
-    };
+    let orbAppearanceTimeout = null;
     
     function startGhostOrbs() {
       if (ghostOrbsActive) return;
       ghostOrbsActive = true;
       orbsVisibilityState = true;
       
-      console.log('Starting camera motion detection orbs');
+      console.log('Starting simple floating overlay orbs');
       
-      // Create debug display
-      createDebugDisplay();
+      // Start the orb appearance cycle
+      startOrbAppearanceCycle();
       
-      // Initialize camera motion detection
-      initializeCameraMotionDetection();
-      
-      // Spawn initial orbs
-      spawnMotionOrbs();
-      
-      // Start visibility cycling
+      // Start visibility cycling (1 min visible, 1 min hidden)
       startOrbsVisibilityCycle();
     }
     
-    function createDebugDisplay() {
-      // Remove on-screen debug - use console only
-      console.log('📹 Camera motion detection debug started - check console for updates');
-    }
-    
-    function updateDebugDisplay() {
-      // Console debug only
-      const visibleOrbs = currentOrbs.filter(o => o.visible).map(o => o.zone.name);
+    function startOrbAppearanceCycle() {
+      if (!ghostOrbsActive || !orbsVisibilityState) return;
       
-      console.log(`📹 Motion: ${currentDirection} | 👻 Orbs: ${currentOrbs.length} | Showing: ${visibleOrbs.join(', ') || 'none'}`);
+      // Random delay between orb appearances (30 seconds to 2 minutes)
+      const delay = 30000 + Math.random() * 90000; // 30s to 2min
+      
+      console.log(`Next orb in ${(delay/1000).toFixed(1)} seconds`);
+      
+      orbAppearanceTimeout = setTimeout(() => {
+        if (ghostOrbsActive && orbsVisibilityState) {
+          spawnRandomOrb();
+        }
+        startOrbAppearanceCycle(); // Schedule next orb
+      }, delay);
     }
     
-    function initializeCameraMotionDetection() {
-      const videoElement = document.querySelector('.camera-feed');
-      if (!videoElement) {
-        console.log('No camera feed found, using fallback motion simulation');
-        startFallbackMotion();
-        return;
+    function spawnRandomOrb() {
+      // Remove existing orb if any
+      if (currentOrb) {
+        clearCurrentOrb();
       }
       
-      // Create hidden canvas for motion detection
-      motionCanvas = document.createElement('canvas');
-      motionCanvas.width = 160; // Low res for performance
-      motionCanvas.height = 120;
-      motionCanvas.style.display = 'none';
-      document.body.appendChild(motionCanvas);
-      motionContext = motionCanvas.getContext('2d');
-      
-      console.log('Camera motion detection initialized');
-      
-      // Start motion detection loop
-      startMotionDetection(videoElement);
-    }
-    
-    function startMotionDetection(videoElement) {
-      motionDetectionInterval = setInterval(() => {
-        if (!videoElement.videoWidth || !videoElement.videoHeight) {
-          return; // Video not ready yet
-        }
-        
-        // Draw current frame to canvas
-        motionContext.drawImage(videoElement, 0, 0, motionCanvas.width, motionCanvas.height);
-        const currentFrame = motionContext.getImageData(0, 0, motionCanvas.width, motionCanvas.height);
-        
-        if (previousFrame) {
-          const motion = detectMotionDirection(previousFrame, currentFrame);
-          if (motion.direction !== currentDirection) {
-            currentDirection = motion.direction;
-            console.log(`Camera motion detected: ${currentDirection} (strength: ${motion.strength})`);
-            updateOrbVisibility();
-            updateDebugDisplay();
-          }
-        }
-        
-        previousFrame = currentFrame;
-      }, 200); // Check every 200ms for performance
-    }
-    
-    function detectMotionDirection(prevFrame, currFrame) {
-      const width = motionCanvas.width;
-      const height = motionCanvas.height;
-      
-      let totalMotion = 0;
-      let horizontalMotion = 0; // Negative = left, Positive = right
-      let verticalMotion = 0;   // Negative = up, Positive = down
-      
-      // Compare pixels and calculate motion vectors
-      for (let y = 0; y < height; y += 4) { // Skip pixels for performance
-        for (let x = 0; x < width; x += 4) {
-          const idx = (y * width + x) * 4;
-          
-          // Calculate brightness difference
-          const prevBrightness = (prevFrame.data[idx] + prevFrame.data[idx + 1] + prevFrame.data[idx + 2]) / 3;
-          const currBrightness = (currFrame.data[idx] + currFrame.data[idx + 1] + currFrame.data[idx + 2]) / 3;
-          const diff = Math.abs(prevBrightness - currBrightness);
-          
-          if (diff > MOTION_THRESHOLD) {
-            totalMotion += diff;
-            
-            // Weight motion by position to determine direction
-            // If left side is changing more, camera is moving right (objects appear to move left)
-            const xWeight = (x / width) - 0.5; // -0.5 to +0.5
-            const yWeight = (y / height) - 0.5; // -0.5 to +0.5
-            
-            horizontalMotion += diff * xWeight;
-            verticalMotion += diff * yWeight;
-          }
-        }
-      }
-      
-      // Determine primary direction
-      let direction = currentDirection; // Default to current
-      const strength = totalMotion;
-      
-      if (totalMotion > DIRECTION_THRESHOLD) {
-        const absH = Math.abs(horizontalMotion);
-        const absV = Math.abs(verticalMotion);
-        
-        if (absH > absV) {
-          // Horizontal motion dominates
-          if (horizontalMotion < 0) {
-            direction = 'right'; // Camera moving right (objects shift left)
-          } else {
-            direction = 'left';  // Camera moving left (objects shift right)
-          }
-        } else {
-          // Vertical motion dominates
-          if (verticalMotion < 0) {
-            direction = 'down'; // Camera moving down (objects shift up)
-          } else {
-            direction = 'up';   // Camera moving up (objects shift down)
-          }
-        }
-      }
-      
-      return { direction, strength };
-    }
-    
-    function startFallbackMotion() {
-      // Fallback: cycle through directions automatically for testing
-      const directions = ['center', 'left', 'right', 'up', 'down'];
-      let dirIndex = 0;
-      
-      setInterval(() => {
-        currentDirection = directions[dirIndex];
-        dirIndex = (dirIndex + 1) % directions.length;
-        updateOrbVisibility();
-        updateDebugDisplay();
-        console.log(`Fallback motion: ${currentDirection}`);
-      }, 3000); // Change every 3 seconds
-    }
-    
-    function spawnMotionOrbs() {
-      clearAllOrbs();
-      
-      // Pick 2-3 random screen zones for orbs
-      const numOrbs = 2 + Math.floor(Math.random() * 2);
-      const zoneNames = Object.keys(SCREEN_ZONES);
-      const selectedZones = [];
-      
-      while (selectedZones.length < numOrbs) {
-        const zoneName = zoneNames[Math.floor(Math.random() * zoneNames.length)];
-        if (!selectedZones.includes(zoneName)) {
-          selectedZones.push(zoneName);
-        }
-      }
-      
-      // Create orbs for selected zones
-      selectedZones.forEach(zoneName => {
-        createOrbForZone(zoneName, SCREEN_ZONES[zoneName]);
-      });
-      
-      console.log(`Spawned ${numOrbs} motion orbs:`, selectedZones);
-      console.log(`📊 Debug: Active=${ghostOrbsActive}, Visible=${orbsVisibilityState}, Direction=${currentDirection}`);
-      updateOrbVisibility();
-      updateDebugDisplay();
-    }
-    
-    function createOrbForZone(zoneName, zone) {
       const viewport = document.querySelector('.camera-viewport');
-      if (!viewport) {
-        console.error('❌ No camera viewport found!');
-        return;
-      }
-      
-      console.log(`🔍 Creating orb for ${zoneName}:`);
-      console.log(`  📏 Viewport dimensions: ${viewport.clientWidth}x${viewport.clientHeight}`);
-      console.log(`  📍 Zone coordinates: x=${zone.x}, y=${zone.y}`);
+      if (!viewport) return;
       
       const el = document.createElement('div');
       el.className = 'ghost-orb';
       
-      // Random size
-      const size = 10 + Math.random() * 12;
+      // Small, fuzzy orb (6-12px)
+      const size = 6 + Math.random() * 6;
       el.style.width = size + 'px';
       el.style.height = size + 'px';
+      
+      // Extra fuzzy and transparent
+      el.style.filter = 'blur(2px)';
+      el.style.opacity = '0';
+      el.style.transition = 'opacity 0.5s ease-in-out';
       
       // Apply camera mode styling
       if (cameraMode === 'spirit') {
@@ -1077,135 +884,93 @@
         el.classList.add('nightvision-mode');
       }
       
-      // Calculate screen position from zone (0-1) to pixels
-      const screenX = zone.x * viewport.clientWidth;
-      const screenY = zone.y * viewport.clientHeight;
+      // Random position on screen (with margin from edges)
+      const margin = 50;
+      const maxX = viewport.clientWidth - margin - size;
+      const maxY = viewport.clientHeight - margin - size;
+      const startX = margin + Math.random() * maxX;
+      const startY = margin + Math.random() * maxY;
       
-      console.log(`  🎯 Calculated position: (${screenX.toFixed(1)}, ${screenY.toFixed(1)})`);
-      
+      // Orb properties
       const orb = {
         el,
-        zone,
-        zoneName,
-        size,
-        screenX,
-        screenY,
-        lifespan: 15 + Math.random() * 10, // 15-25 seconds
+        x: startX,
+        y: startY,
+        vx: (Math.random() - 0.5) * 20, // Slow drift speed
+        vy: (Math.random() - 0.5) * 20,
         age: 0,
-        visible: false,
-        // Drift movement
-        driftX: 0,
-        driftY: 0,
-        driftSpeed: 0.2 + Math.random() * 0.3
+        lifespan: 1.5 + Math.random() * 1, // 1.5-2.5 seconds visible
+        fadeInTime: 0.5,
+        fadeOutTime: 0.5
       };
       
-      // Position on screen but start invisible
-      el.style.opacity = '0';
-      const transformValue = `translate(${screenX}px, ${screenY}px)`;
-      el.style.transform = transformValue;
-      
-      console.log(`  🎨 Applied transform: ${transformValue}`);
+      // Position orb
+      el.style.position = 'absolute';
+      el.style.left = startX + 'px';
+      el.style.top = startY + 'px';
+      el.style.zIndex = '10';
       
       viewport.appendChild(el);
-      currentOrbs.push(orb);
+      currentOrb = orb;
       
-      // Check if transform was actually applied
+      console.log(`Orb spawned at (${startX.toFixed(0)}, ${startY.toFixed(0)}) for ${orb.lifespan.toFixed(1)}s`);
+      
+      // Fade in
       setTimeout(() => {
-        const computedStyle = window.getComputedStyle(el);
-        const appliedTransform = computedStyle.transform;
-        const rect = el.getBoundingClientRect();
-        const position = computedStyle.position;
-        const left = computedStyle.left;
-        const top = computedStyle.top;
-        
-        console.log(`  ✅ Element styles:`);
-        console.log(`     Position: ${position}`);
-        console.log(`     Left: ${left}, Top: ${top}`);
-        console.log(`     Transform: ${appliedTransform}`);
-        console.log(`     BoundingRect: left=${rect.left.toFixed(1)}, top=${rect.top.toFixed(1)}`);
-        
-        if (rect.left < 100 && rect.top < 100) {
-          console.warn(`⚠️  ORB STILL IN TOP LEFT!`);
-          console.warn(`     Expected: (${screenX}, ${screenY}), Got: (${rect.left}, ${rect.top})`);
-          console.warn(`     Check for CSS overrides!`);
-          
-          // Try to force position with different method
-          console.log(`     🔧 Trying alternative positioning...`);
-          el.style.position = 'absolute';
-          el.style.left = screenX + 'px';
-          el.style.top = screenY + 'px';
-          el.style.transform = 'none';
-          
-          setTimeout(() => {
-            const newRect = el.getBoundingClientRect();
-            console.log(`     🔧 After position fix: (${newRect.left.toFixed(1)}, ${newRect.top.toFixed(1)})`);
-          }, 50);
-        }
-      }, 100);
+        el.style.opacity = '0.3'; // Very transparent
+      }, 50);
+      
+      // Start floating animation
+      startOrbFloating(orb);
     }
     
-    function updateOrbVisibility() {
-      if (!ghostOrbsActive || !orbsVisibilityState) return;
-      
-      currentOrbs.forEach(orb => {
-        // Show orb if camera direction matches or is related to orb zone
-        const shouldBeVisible = isDirectionMatching(currentDirection, orb.zoneName);
+    function startOrbFloating(orb) {
+      const floatInterval = setInterval(() => {
+        if (!orb.el || !orb.el.parentNode) {
+          clearInterval(floatInterval);
+          return;
+        }
         
-        if (shouldBeVisible && !orb.visible) {
-          orb.el.style.opacity = '1';
-          orb.visible = true;
-          console.log(`✅ Orb visible: ${orb.zoneName} (looking ${currentDirection}) at (${orb.screenX.toFixed(1)}, ${orb.screenY.toFixed(1)})`);
-          
-          // Check actual position when made visible
-          setTimeout(() => {
-            const rect = orb.el.getBoundingClientRect();
-            if (rect.left < 100 && rect.top < 100) {
-              console.warn(`⚠️  VISIBLE ORB IN TOP LEFT! Zone: ${orb.zoneName}, Expected: (${orb.screenX}, ${orb.screenY}), Actual: (${rect.left}, ${rect.top})`);
-              console.warn(`     Transform: ${orb.el.style.transform}`);
-              console.warn(`     Computed: ${window.getComputedStyle(orb.el).transform}`);
-            }
-          }, 50);
-          
-        } else if (!shouldBeVisible && orb.visible) {
+        orb.age += 0.1;
+        
+        // Check if it's time to fade out
+        const timeToFadeOut = orb.lifespan - orb.fadeOutTime;
+        if (orb.age >= timeToFadeOut && orb.el.style.opacity !== '0') {
           orb.el.style.opacity = '0';
-          orb.visible = false;
-          console.log(`❌ Orb hidden: ${orb.zoneName} (looking ${currentDirection})`);
+          console.log('Orb fading out');
         }
         
-        // Add subtle drift movement
-        if (orb.visible) {
-          orb.driftX += (Math.random() - 0.5) * orb.driftSpeed;
-          orb.driftY += (Math.random() - 0.5) * orb.driftSpeed;
-          
-          // Keep drift reasonable
-          orb.driftX = Math.max(-20, Math.min(20, orb.driftX));
-          orb.driftY = Math.max(-20, Math.min(20, orb.driftY));
-          
-          const finalX = orb.screenX + orb.driftX;
-          const finalY = orb.screenY + orb.driftY;
-          const newTransform = `translate(${finalX}px, ${finalY}px)`;
-          orb.el.style.transform = newTransform;
-          
-          // Log drift movement occasionally
-          if (Math.random() < 0.01) { // 1% chance
-            console.log(`🌊 Drift update: ${orb.zoneName} → ${newTransform}`);
-          }
+        // Remove orb when fully faded
+        if (orb.age >= orb.lifespan) {
+          clearInterval(floatInterval);
+          clearCurrentOrb();
+          return;
         }
-      });
+        
+        // Update position with gentle floating
+        orb.x += orb.vx * 0.1;
+        orb.y += orb.vy * 0.1;
+        
+        // Subtle direction changes
+        orb.vx += (Math.random() - 0.5) * 2;
+        orb.vy += (Math.random() - 0.5) * 2;
+        
+        // Keep velocities reasonable
+        orb.vx = Math.max(-30, Math.min(30, orb.vx));
+        orb.vy = Math.max(-30, Math.min(30, orb.vy));
+        
+        // Update element position
+        orb.el.style.left = orb.x + 'px';
+        orb.el.style.top = orb.y + 'px';
+        
+      }, 100); // Update every 100ms
     }
     
-    function isDirectionMatching(cameraDir, orbZone) {
-      // Map camera directions to orb zones that should be visible
-      const directionMap = {
-        'center': ['center', 'front_wall'],
-        'left': ['left', 'left_wall', 'up_left', 'down_left'],
-        'right': ['right', 'right_wall', 'up_right', 'down_right'],
-        'up': ['up', 'ceiling', 'up_left', 'up_right'],
-        'down': ['down', 'floor', 'down_left', 'down_right']
-      };
-      
-      const validZones = directionMap[cameraDir] || [];
-      return validZones.some(zone => orbZone.includes(zone));
+    function clearCurrentOrb() {
+      if (currentOrb && currentOrb.el && currentOrb.el.parentNode) {
+        currentOrb.el.parentNode.removeChild(currentOrb.el);
+      }
+      currentOrb = null;
     }
     
     function startOrbsVisibilityCycle() {
@@ -1219,23 +984,26 @@
           if (!ghostOrbsActive) return;
           console.log('🌙 Hiding orbs for 1 minute');
           orbsVisibilityState = false;
-          clearAllOrbs();
-          updateDebugDisplay();
+          clearCurrentOrb();
+          if (orbAppearanceTimeout) {
+            clearTimeout(orbAppearanceTimeout);
+            orbAppearanceTimeout = null;
+          }
           startOrbsVisibilityCycle();
         }, visibleDuration);
       } else {
         orbsLoop = setTimeout(() => {
           if (!ghostOrbsActive) return;
-          console.log('👻 Showing new orbs for 1 minute');
+          console.log('👻 Showing orbs for 1 minute');
           orbsVisibilityState = true;
-          spawnMotionOrbs();
+          startOrbAppearanceCycle();
           startOrbsVisibilityCycle();
         }, hiddenDuration);
       }
     }
     
     function stopGhostOrbs() {
-      console.log('Stopping camera motion orbs');
+      console.log('Stopping floating orbs');
       ghostOrbsActive = false;
       orbsVisibilityState = false;
       
@@ -1244,64 +1012,17 @@
         orbsLoop = null;
       }
       
-      if (motionDetectionInterval) {
-        clearInterval(motionDetectionInterval);
-        motionDetectionInterval = null;
+      if (orbAppearanceTimeout) {
+        clearTimeout(orbAppearanceTimeout);
+        orbAppearanceTimeout = null;
       }
       
-      if (motionCanvas) {
-        motionCanvas.remove();
-        motionCanvas = null;
-      }
-      
-      clearAllOrbs();
+      clearCurrentOrb();
     }
     
-    function clearAllOrbs() {
-      currentOrbs.forEach(o => {
-        if (o.el && o.el.parentNode) o.el.parentNode.removeChild(o.el);
-      });
-      currentOrbs = [];
-    }
-    
-    // Orb aging loop
-    let lastOrbTime = performance.now();
-    function orbsTick(now) {
-      const dt = Math.min((now - lastOrbTime) / 1000, 0.05);
-      lastOrbTime = now;
-      
-      if (ghostOrbsActive && currentOrbs.length > 0) {
-        for (let i = currentOrbs.length - 1; i >= 0; i--) {
-          const orb = currentOrbs[i];
-          orb.age += dt;
-          
-          // Remove old orbs
-          if (orb.age >= orb.lifespan) {
-            if (orb.el && orb.el.parentNode) {
-              orb.el.parentNode.removeChild(orb.el);
-            }
-            currentOrbs.splice(i, 1);
-            console.log(`⏰ Orb expired: ${orb.zoneName}`);
-            updateDebugDisplay();
-            continue;
-          }
-          
-          // Fade out aging orbs
-          const fadeStart = orb.lifespan * 0.8;
-          if (orb.age > fadeStart && orb.visible) {
-            const fadeProgress = (orb.age - fadeStart) / (orb.lifespan - fadeStart);
-            const opacity = 1 - fadeProgress;
-            orb.el.style.opacity = opacity;
-          }
-        }
-        
-        // Spawn replacement orbs if needed
-        if (orbsVisibilityState && currentOrbs.length < 2) {
-          console.log('🔄 Spawning replacement orbs');
-          spawnMotionOrbs();
-        }
-      }
-      
+    // Simple orb tick (much lighter than before)
+    function orbsTick() {
+      // No longer needed - floating is handled in startOrbFloating
       requestAnimationFrame(orbsTick);
     }
     requestAnimationFrame(orbsTick);
