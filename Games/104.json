@@ -27,7 +27,7 @@
     {
       "effect": "sighting",
       "time": 0.5,
-      "image": 01.png,
+      "image": "01.png",
       "fade": true,
   "rush": true,
   "size": "120px",
