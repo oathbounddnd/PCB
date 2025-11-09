@@ -29,13 +29,13 @@
       "time": 0.5,
       "image": "01.png",
       "fade": true,
-  "rush": true,
-  "size": "120px",
-  "duration": 5000,
-  "fade_delay": 1500,
-  "rush_delay": 1000,
-  "audio": "Poltergeist02.mp3",
-  "volume": "medium"
+      "rush": true,
+      "size": "120px",
+      "duration": 5000,
+      "fade_delay": 1500,
+      "rush_delay": 1000,
+      "audio": "Poltergeist02.mp3",
+      "volume": "medium"
     },
     {
       "effect": "emf_spike",
