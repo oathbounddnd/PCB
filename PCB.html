@@ -842,57 +842,59 @@
     let cameraMode = 'normal';
     let flashlightOn = false;
 
-    // ===== INVISIBLE RADAR MOTION TRACKING ORBS =====
+    // ===== CAMERA MOTION DETECTION ORBS =====
     let ghostOrbsActive = false;
     let orbsVisibilityState = false;
     let currentOrbs = [];
     let orbsLoop = null;
     let maxOrbs = 3;
     
-    // Device orientation values
-    let deviceAlpha = 0;  // Compass direction (0-360)
-    let deviceBeta = 0;   // Front-back tilt (-180 to 180) 
-    let deviceGamma = 0;  // Left-right tilt (-90 to 90)
-    let orientationWorking = false;
-    
-    // Debug display element
+    // Camera motion detection
+    let motionCanvas = null;
+    let motionContext = null;
+    let previousFrame = null;
+    let currentDirection = 'center';
+    let motionDetectionInterval = null;
     let debugDisplay = null;
     
-    // Invisible radar positions (imagine a radar circle on screen)
-    const RADAR_POSITIONS = [
-      // 8 directions around an invisible radar circle
-      { name: 'north', angle: 0, x: 0.5, y: 0.2, gamma: 0, beta: -30 },      // Top center (looking up)
-      { name: 'northeast', angle: 45, x: 0.7, y: 0.3, gamma: 20, beta: -15 }, // Top right
-      { name: 'east', angle: 90, x: 0.8, y: 0.5, gamma: 40, beta: 0 },        // Right center  
-      { name: 'southeast', angle: 135, x: 0.7, y: 0.7, gamma: 20, beta: 15 }, // Bottom right
-      { name: 'south', angle: 180, x: 0.5, y: 0.8, gamma: 0, beta: 30 },      // Bottom center (looking down)
-      { name: 'southwest', angle: 225, x: 0.3, y: 0.7, gamma: -20, beta: 15 },// Bottom left
-      { name: 'west', angle: 270, x: 0.2, y: 0.5, gamma: -40, beta: 0 },      // Left center
-      { name: 'northwest', angle: 315, x: 0.3, y: 0.3, gamma: -20, beta: -15 } // Top left
-    ];
+    // Motion sensitivity
+    const MOTION_THRESHOLD = 20; // Minimum pixel change to register movement
+    const DIRECTION_THRESHOLD = 50; // Minimum directional bias to change direction
+    
+    // Screen zones for orbs (fixed positions)
+    const SCREEN_ZONES = {
+      'up': { x: 0.5, y: 0.15, name: 'ceiling' },
+      'down': { x: 0.5, y: 0.85, name: 'floor' },
+      'left': { x: 0.15, y: 0.5, name: 'left_wall' },
+      'right': { x: 0.85, y: 0.5, name: 'right_wall' },
+      'center': { x: 0.5, y: 0.5, name: 'front_wall' },
+      'up_left': { x: 0.25, y: 0.25, name: 'ceiling_left' },
+      'up_right': { x: 0.75, y: 0.25, name: 'ceiling_right' },
+      'down_left': { x: 0.25, y: 0.75, name: 'floor_left' },
+      'down_right': { x: 0.75, y: 0.75, name: 'floor_right' }
+    };
     
     function startGhostOrbs() {
       if (ghostOrbsActive) return;
       ghostOrbsActive = true;
       orbsVisibilityState = true;
       
-      console.log('Starting invisible radar orbs with debugging');
+      console.log('Starting camera motion detection orbs');
       
       // Create debug display
       createDebugDisplay();
       
-      // Start device orientation tracking
-      startDeviceTracking();
+      // Initialize camera motion detection
+      initializeCameraMotionDetection();
       
       // Spawn initial orbs
-      spawnRadarOrbs();
+      spawnMotionOrbs();
       
       // Start visibility cycling
       startOrbsVisibilityCycle();
     }
     
     function createDebugDisplay() {
-      // Create debug overlay
       debugDisplay = document.createElement('div');
       debugDisplay.style.cssText = `
         position: fixed;
@@ -906,7 +908,7 @@
         font-size: 11px;
         z-index: 9999;
         line-height: 1.2;
-        max-width: 200px;
+        max-width: 220px;
       `;
       document.body.appendChild(debugDisplay);
       updateDebugDisplay();
@@ -915,137 +917,169 @@
     function updateDebugDisplay() {
       if (!debugDisplay) return;
       
-      const visibleOrbs = currentOrbs.filter(o => o.visible).map(o => o.direction.name);
+      const visibleOrbs = currentOrbs.filter(o => o.visible).map(o => o.zone.name);
       
       debugDisplay.innerHTML = `
-        <div><strong>📱 DEVICE ORIENTATION</strong></div>
-        <div>Alpha: ${deviceAlpha.toFixed(1)}°</div>
-        <div>Beta: ${deviceBeta.toFixed(1)}°</div>  
-        <div>Gamma: ${deviceGamma.toFixed(1)}°</div>
-        <div>Working: ${orientationWorking ? '✅' : '❌'}</div>
+        <div><strong>📹 CAMERA MOTION</strong></div>
+        <div>Detection: ${motionDetectionInterval ? '✅' : '❌'}</div>
+        <div>Direction: ${currentDirection}</div>
+        <div>Threshold: ${MOTION_THRESHOLD}px</div>
         <div><strong>👻 ORBS</strong></div>
         <div>Active: ${ghostOrbsActive ? '✅' : '❌'}</div>
         <div>Visible: ${orbsVisibilityState ? '✅' : '❌'}</div>
         <div>Count: ${currentOrbs.length}</div>
         <div>Showing: ${visibleOrbs.join(', ') || 'none'}</div>
-        <div><strong>🎯 FACING</strong></div>
-        <div>${getCurrentDirection()}</div>
+        <div><strong>🎯 LOOKING AT</strong></div>
+        <div>${SCREEN_ZONES[currentDirection]?.name || 'unknown'}</div>
       `;
     }
     
-    function getCurrentDirection() {
-      // Determine which direction we're currently facing based on device orientation
-      const tolerance = 25; // degrees of tolerance
+    function initializeCameraMotionDetection() {
+      const videoElement = document.querySelector('.camera-feed');
+      if (!videoElement) {
+        console.log('No camera feed found, using fallback motion simulation');
+        startFallbackMotion();
+        return;
+      }
       
-      for (const pos of RADAR_POSITIONS) {
-        const gammaDiff = Math.abs(deviceGamma - pos.gamma);
-        const betaDiff = Math.abs(deviceBeta - pos.beta);
+      // Create hidden canvas for motion detection
+      motionCanvas = document.createElement('canvas');
+      motionCanvas.width = 160; // Low res for performance
+      motionCanvas.height = 120;
+      motionCanvas.style.display = 'none';
+      document.body.appendChild(motionCanvas);
+      motionContext = motionCanvas.getContext('2d');
+      
+      console.log('Camera motion detection initialized');
+      
+      // Start motion detection loop
+      startMotionDetection(videoElement);
+    }
+    
+    function startMotionDetection(videoElement) {
+      motionDetectionInterval = setInterval(() => {
+        if (!videoElement.videoWidth || !videoElement.videoHeight) {
+          return; // Video not ready yet
+        }
         
-        if (gammaDiff <= tolerance && betaDiff <= tolerance) {
-          return `${pos.name} (${pos.gamma}°/${pos.beta}°)`;
+        // Draw current frame to canvas
+        motionContext.drawImage(videoElement, 0, 0, motionCanvas.width, motionCanvas.height);
+        const currentFrame = motionContext.getImageData(0, 0, motionCanvas.width, motionCanvas.height);
+        
+        if (previousFrame) {
+          const motion = detectMotionDirection(previousFrame, currentFrame);
+          if (motion.direction !== currentDirection) {
+            currentDirection = motion.direction;
+            console.log(`Camera motion detected: ${currentDirection} (strength: ${motion.strength})`);
+            updateOrbVisibility();
+            updateDebugDisplay();
+          }
+        }
+        
+        previousFrame = currentFrame;
+      }, 200); // Check every 200ms for performance
+    }
+    
+    function detectMotionDirection(prevFrame, currFrame) {
+      const width = motionCanvas.width;
+      const height = motionCanvas.height;
+      
+      let totalMotion = 0;
+      let horizontalMotion = 0; // Negative = left, Positive = right
+      let verticalMotion = 0;   // Negative = up, Positive = down
+      
+      // Compare pixels and calculate motion vectors
+      for (let y = 0; y < height; y += 4) { // Skip pixels for performance
+        for (let x = 0; x < width; x += 4) {
+          const idx = (y * width + x) * 4;
+          
+          // Calculate brightness difference
+          const prevBrightness = (prevFrame.data[idx] + prevFrame.data[idx + 1] + prevFrame.data[idx + 2]) / 3;
+          const currBrightness = (currFrame.data[idx] + currFrame.data[idx + 1] + currFrame.data[idx + 2]) / 3;
+          const diff = Math.abs(prevBrightness - currBrightness);
+          
+          if (diff > MOTION_THRESHOLD) {
+            totalMotion += diff;
+            
+            // Weight motion by position to determine direction
+            // If left side is changing more, camera is moving right (objects appear to move left)
+            const xWeight = (x / width) - 0.5; // -0.5 to +0.5
+            const yWeight = (y / height) - 0.5; // -0.5 to +0.5
+            
+            horizontalMotion += diff * xWeight;
+            verticalMotion += diff * yWeight;
+          }
         }
       }
       
-      return `unknown (${deviceGamma.toFixed(1)}°/${deviceBeta.toFixed(1)}°)`;
-    }
-    
-    function startDeviceTracking() {
-      if (window.DeviceOrientationEvent) {
-        // Try to get permission on iOS
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission()
-            .then(response => {
-              if (response === 'granted') {
-                setupOrientationTracking();
-              } else {
-                console.log('Permission denied, using auto-simulation');
-                simulateOrientation();
-              }
-            })
-            .catch(() => {
-              simulateOrientation();
-            });
+      // Determine primary direction
+      let direction = currentDirection; // Default to current
+      const strength = totalMotion;
+      
+      if (totalMotion > DIRECTION_THRESHOLD) {
+        const absH = Math.abs(horizontalMotion);
+        const absV = Math.abs(verticalMotion);
+        
+        if (absH > absV) {
+          // Horizontal motion dominates
+          if (horizontalMotion < 0) {
+            direction = 'right'; // Camera moving right (objects shift left)
+          } else {
+            direction = 'left';  // Camera moving left (objects shift right)
+          }
         } else {
-          setupOrientationTracking();
+          // Vertical motion dominates
+          if (verticalMotion < 0) {
+            direction = 'down'; // Camera moving down (objects shift up)
+          } else {
+            direction = 'up';   // Camera moving up (objects shift down)
+          }
         }
-      } else {
-        console.log('Device orientation not supported, using auto-simulation');
-        simulateOrientation();
       }
-    }
-    
-    function setupOrientationTracking() {
-      window.addEventListener('deviceorientation', (e) => {
-        // Raw values from device
-        const rawAlpha = e.alpha || 0;
-        const rawBeta = e.beta || 0;
-        const rawGamma = e.gamma || 0;
-        
-        // Store raw values
-        deviceAlpha = rawAlpha;
-        deviceBeta = rawBeta;
-        deviceGamma = rawGamma;
-        
-        orientationWorking = true;
-        
-        // Debug log occasionally
-        if (Math.random() < 0.05) { // 5% chance each update
-          console.log(`Raw orientation: α=${rawAlpha.toFixed(1)} β=${rawBeta.toFixed(1)} γ=${rawGamma.toFixed(1)}`);
-        }
-        
-        updateOrbVisibility();
-        updateDebugDisplay();
-      });
       
-      console.log('Device orientation tracking started');
+      return { direction, strength };
     }
     
-    function simulateOrientation() {
-      // Auto-simulate device orientation for testing/fallback
-      let simTime = 0;
+    function startFallbackMotion() {
+      // Fallback: cycle through directions automatically for testing
+      const directions = ['center', 'left', 'right', 'up', 'down'];
+      let dirIndex = 0;
       
       setInterval(() => {
-        simTime += 0.1;
-        
-        // Slowly cycle through different orientations
-        deviceGamma = Math.sin(simTime) * 40;          // -40 to +40 degrees
-        deviceBeta = Math.cos(simTime * 0.7) * 25;     // -25 to +25 degrees
-        deviceAlpha = (simTime * 10) % 360;            // Slowly rotate compass
-        
-        orientationWorking = false; // Mark as simulated
-        
+        currentDirection = directions[dirIndex];
+        dirIndex = (dirIndex + 1) % directions.length;
         updateOrbVisibility();
         updateDebugDisplay();
-      }, 500); // Update every 500ms
-      
-      console.log('Using orientation simulation (auto-cycle)');
+        console.log(`Fallback motion: ${currentDirection}`);
+      }, 3000); // Change every 3 seconds
     }
     
-    function spawnRadarOrbs() {
+    function spawnMotionOrbs() {
       clearAllOrbs();
       
-      // Pick 2-3 random radar positions
+      // Pick 2-3 random screen zones for orbs
       const numOrbs = 2 + Math.floor(Math.random() * 2);
-      const selectedPositions = [];
+      const zoneNames = Object.keys(SCREEN_ZONES);
+      const selectedZones = [];
       
-      while (selectedPositions.length < numOrbs) {
-        const pos = RADAR_POSITIONS[Math.floor(Math.random() * RADAR_POSITIONS.length)];
-        if (!selectedPositions.find(p => p.name === pos.name)) {
-          selectedPositions.push(pos);
+      while (selectedZones.length < numOrbs) {
+        const zoneName = zoneNames[Math.floor(Math.random() * zoneNames.length)];
+        if (!selectedZones.includes(zoneName)) {
+          selectedZones.push(zoneName);
         }
       }
       
-      // Create orbs at selected radar positions
-      selectedPositions.forEach(position => {
-        createRadarOrb(position);
+      // Create orbs for selected zones
+      selectedZones.forEach(zoneName => {
+        createOrbForZone(zoneName, SCREEN_ZONES[zoneName]);
       });
       
-      console.log(`Spawned ${numOrbs} radar orbs:`, selectedPositions.map(p => p.name));
+      console.log(`Spawned ${numOrbs} motion orbs:`, selectedZones);
       updateOrbVisibility();
       updateDebugDisplay();
     }
     
-    function createRadarOrb(radarPosition) {
+    function createOrbForZone(zoneName, zone) {
       const viewport = document.querySelector('.camera-viewport');
       if (!viewport) return;
       
@@ -1064,20 +1098,21 @@
         el.classList.add('nightvision-mode');
       }
       
-      // Convert radar position (0-1) to actual screen pixels
-      const screenX = radarPosition.x * viewport.clientWidth;
-      const screenY = radarPosition.y * viewport.clientHeight;
+      // Calculate screen position from zone (0-1) to pixels
+      const screenX = zone.x * viewport.clientWidth;
+      const screenY = zone.y * viewport.clientHeight;
       
       const orb = {
         el,
-        direction: radarPosition,
+        zone,
+        zoneName,
         size,
         screenX,
         screenY,
-        lifespan: 12 + Math.random() * 8, // 12-20 seconds
+        lifespan: 15 + Math.random() * 10, // 15-25 seconds
         age: 0,
         visible: false,
-        // Subtle drift
+        // Drift movement
         driftX: 0,
         driftY: 0,
         driftSpeed: 0.2 + Math.random() * 0.3
@@ -1087,7 +1122,7 @@
       el.style.opacity = '0';
       el.style.transform = `translate(${screenX}px, ${screenY}px)`;
       
-      console.log(`Created orb at ${radarPosition.name}: screen(${screenX.toFixed(0)}, ${screenY.toFixed(0)}) radar(${radarPosition.x}, ${radarPosition.y})`);
+      console.log(`Created orb at ${zoneName}: screen(${screenX.toFixed(0)}, ${screenY.toFixed(0)})`);
       
       viewport.appendChild(el);
       currentOrbs.push(orb);
@@ -1096,28 +1131,18 @@
     function updateOrbVisibility() {
       if (!ghostOrbsActive || !orbsVisibilityState) return;
       
-      const tolerance = 25; // degrees of tolerance for showing orbs
-      
       currentOrbs.forEach(orb => {
-        const pos = orb.direction;
-        
-        // Check if current device orientation matches this orb's radar position
-        const gammaDiff = Math.abs(deviceGamma - pos.gamma);
-        const betaDiff = Math.abs(deviceBeta - pos.beta);
-        const distance = Math.sqrt(gammaDiff * gammaDiff + betaDiff * betaDiff);
-        
-        const shouldBeVisible = distance <= tolerance;
+        // Show orb if camera direction matches or is related to orb zone
+        const shouldBeVisible = isDirectionMatching(currentDirection, orb.zoneName);
         
         if (shouldBeVisible && !orb.visible) {
-          // Fade in orb
           orb.el.style.opacity = '1';
           orb.visible = true;
-          console.log(`✅ Orb visible: ${pos.name} (distance: ${distance.toFixed(1)})`);
+          console.log(`✅ Orb visible: ${orb.zoneName} (looking ${currentDirection})`);
         } else if (!shouldBeVisible && orb.visible) {
-          // Fade out orb
           orb.el.style.opacity = '0';
           orb.visible = false;
-          console.log(`❌ Orb hidden: ${pos.name} (distance: ${distance.toFixed(1)})`);
+          console.log(`❌ Orb hidden: ${orb.zoneName} (looking ${currentDirection})`);
         }
         
         // Add subtle drift movement
@@ -1126,14 +1151,28 @@
           orb.driftY += (Math.random() - 0.5) * orb.driftSpeed;
           
           // Keep drift reasonable
-          orb.driftX = Math.max(-15, Math.min(15, orb.driftX));
-          orb.driftY = Math.max(-15, Math.min(15, orb.driftY));
+          orb.driftX = Math.max(-20, Math.min(20, orb.driftX));
+          orb.driftY = Math.max(-20, Math.min(20, orb.driftY));
           
           const finalX = orb.screenX + orb.driftX;
           const finalY = orb.screenY + orb.driftY;
           orb.el.style.transform = `translate(${finalX}px, ${finalY}px)`;
         }
       });
+    }
+    
+    function isDirectionMatching(cameraDir, orbZone) {
+      // Map camera directions to orb zones that should be visible
+      const directionMap = {
+        'center': ['center', 'front_wall'],
+        'left': ['left', 'left_wall', 'up_left', 'down_left'],
+        'right': ['right', 'right_wall', 'up_right', 'down_right'],
+        'up': ['up', 'ceiling', 'up_left', 'up_right'],
+        'down': ['down', 'floor', 'down_left', 'down_right']
+      };
+      
+      const validZones = directionMap[cameraDir] || [];
+      return validZones.some(zone => orbZone.includes(zone));
     }
     
     function startOrbsVisibilityCycle() {
@@ -1156,24 +1195,37 @@
           if (!ghostOrbsActive) return;
           console.log('👻 Showing new orbs for 1 minute');
           orbsVisibilityState = true;
-          spawnRadarOrbs();
+          spawnMotionOrbs();
           startOrbsVisibilityCycle();
         }, hiddenDuration);
       }
     }
     
     function stopGhostOrbs() {
-      console.log('Stopping radar orbs');
+      console.log('Stopping camera motion orbs');
       ghostOrbsActive = false;
       orbsVisibilityState = false;
+      
       if (orbsLoop) {
         clearTimeout(orbsLoop);
         orbsLoop = null;
       }
+      
+      if (motionDetectionInterval) {
+        clearInterval(motionDetectionInterval);
+        motionDetectionInterval = null;
+      }
+      
+      if (motionCanvas) {
+        motionCanvas.remove();
+        motionCanvas = null;
+      }
+      
       if (debugDisplay) {
         debugDisplay.remove();
         debugDisplay = null;
       }
+      
       clearAllOrbs();
     }
     
@@ -1201,7 +1253,7 @@
               orb.el.parentNode.removeChild(orb.el);
             }
             currentOrbs.splice(i, 1);
-            console.log(`⏰ Orb expired: ${orb.direction.name}`);
+            console.log(`⏰ Orb expired: ${orb.zoneName}`);
             updateDebugDisplay();
             continue;
           }
@@ -1218,7 +1270,7 @@
         // Spawn replacement orbs if needed
         if (orbsVisibilityState && currentOrbs.length < 2) {
           console.log('🔄 Spawning replacement orbs');
-          spawnRadarOrbs();
+          spawnMotionOrbs();
         }
       }
       
