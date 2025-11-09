@@ -855,7 +855,6 @@
     let previousFrame = null;
     let currentDirection = 'center';
     let motionDetectionInterval = null;
-    let debugDisplay = null;
     
     // Motion sensitivity
     const MOTION_THRESHOLD = 20; // Minimum pixel change to register movement
@@ -895,43 +894,15 @@
     }
     
     function createDebugDisplay() {
-      debugDisplay = document.createElement('div');
-      debugDisplay.style.cssText = `
-        position: fixed;
-        top: 60px;
-        left: 10px;
-        background: rgba(0,0,0,0.8);
-        color: #0f0;
-        padding: 10px;
-        border-radius: 5px;
-        font-family: monospace;
-        font-size: 11px;
-        z-index: 9999;
-        line-height: 1.2;
-        max-width: 220px;
-      `;
-      document.body.appendChild(debugDisplay);
-      updateDebugDisplay();
+      // Remove on-screen debug - use console only
+      console.log('📹 Camera motion detection debug started - check console for updates');
     }
     
     function updateDebugDisplay() {
-      if (!debugDisplay) return;
-      
+      // Console debug only
       const visibleOrbs = currentOrbs.filter(o => o.visible).map(o => o.zone.name);
       
-      debugDisplay.innerHTML = `
-        <div><strong>📹 CAMERA MOTION</strong></div>
-        <div>Detection: ${motionDetectionInterval ? '✅' : '❌'}</div>
-        <div>Direction: ${currentDirection}</div>
-        <div>Threshold: ${MOTION_THRESHOLD}px</div>
-        <div><strong>👻 ORBS</strong></div>
-        <div>Active: ${ghostOrbsActive ? '✅' : '❌'}</div>
-        <div>Visible: ${orbsVisibilityState ? '✅' : '❌'}</div>
-        <div>Count: ${currentOrbs.length}</div>
-        <div>Showing: ${visibleOrbs.join(', ') || 'none'}</div>
-        <div><strong>🎯 LOOKING AT</strong></div>
-        <div>${SCREEN_ZONES[currentDirection]?.name || 'unknown'}</div>
-      `;
+      console.log(`📹 Motion: ${currentDirection} | 👻 Orbs: ${currentOrbs.length} | Showing: ${visibleOrbs.join(', ') || 'none'}`);
     }
     
     function initializeCameraMotionDetection() {
@@ -1075,13 +1046,21 @@
       });
       
       console.log(`Spawned ${numOrbs} motion orbs:`, selectedZones);
+      console.log(`📊 Debug: Active=${ghostOrbsActive}, Visible=${orbsVisibilityState}, Direction=${currentDirection}`);
       updateOrbVisibility();
       updateDebugDisplay();
     }
     
     function createOrbForZone(zoneName, zone) {
       const viewport = document.querySelector('.camera-viewport');
-      if (!viewport) return;
+      if (!viewport) {
+        console.error('❌ No camera viewport found!');
+        return;
+      }
+      
+      console.log(`🔍 Creating orb for ${zoneName}:`);
+      console.log(`  📏 Viewport dimensions: ${viewport.clientWidth}x${viewport.clientHeight}`);
+      console.log(`  📍 Zone coordinates: x=${zone.x}, y=${zone.y}`);
       
       const el = document.createElement('div');
       el.className = 'ghost-orb';
@@ -1102,6 +1081,8 @@
       const screenX = zone.x * viewport.clientWidth;
       const screenY = zone.y * viewport.clientHeight;
       
+      console.log(`  🎯 Calculated position: (${screenX.toFixed(1)}, ${screenY.toFixed(1)})`);
+      
       const orb = {
         el,
         zone,
@@ -1120,12 +1101,47 @@
       
       // Position on screen but start invisible
       el.style.opacity = '0';
-      el.style.transform = `translate(${screenX}px, ${screenY}px)`;
+      const transformValue = `translate(${screenX}px, ${screenY}px)`;
+      el.style.transform = transformValue;
       
-      console.log(`Created orb at ${zoneName}: screen(${screenX.toFixed(0)}, ${screenY.toFixed(0)})`);
+      console.log(`  🎨 Applied transform: ${transformValue}`);
       
       viewport.appendChild(el);
       currentOrbs.push(orb);
+      
+      // Check if transform was actually applied
+      setTimeout(() => {
+        const computedStyle = window.getComputedStyle(el);
+        const appliedTransform = computedStyle.transform;
+        const rect = el.getBoundingClientRect();
+        const position = computedStyle.position;
+        const left = computedStyle.left;
+        const top = computedStyle.top;
+        
+        console.log(`  ✅ Element styles:`);
+        console.log(`     Position: ${position}`);
+        console.log(`     Left: ${left}, Top: ${top}`);
+        console.log(`     Transform: ${appliedTransform}`);
+        console.log(`     BoundingRect: left=${rect.left.toFixed(1)}, top=${rect.top.toFixed(1)}`);
+        
+        if (rect.left < 100 && rect.top < 100) {
+          console.warn(`⚠️  ORB STILL IN TOP LEFT!`);
+          console.warn(`     Expected: (${screenX}, ${screenY}), Got: (${rect.left}, ${rect.top})`);
+          console.warn(`     Check for CSS overrides!`);
+          
+          // Try to force position with different method
+          console.log(`     🔧 Trying alternative positioning...`);
+          el.style.position = 'absolute';
+          el.style.left = screenX + 'px';
+          el.style.top = screenY + 'px';
+          el.style.transform = 'none';
+          
+          setTimeout(() => {
+            const newRect = el.getBoundingClientRect();
+            console.log(`     🔧 After position fix: (${newRect.left.toFixed(1)}, ${newRect.top.toFixed(1)})`);
+          }, 50);
+        }
+      }, 100);
     }
     
     function updateOrbVisibility() {
@@ -1138,7 +1154,18 @@
         if (shouldBeVisible && !orb.visible) {
           orb.el.style.opacity = '1';
           orb.visible = true;
-          console.log(`✅ Orb visible: ${orb.zoneName} (looking ${currentDirection})`);
+          console.log(`✅ Orb visible: ${orb.zoneName} (looking ${currentDirection}) at (${orb.screenX.toFixed(1)}, ${orb.screenY.toFixed(1)})`);
+          
+          // Check actual position when made visible
+          setTimeout(() => {
+            const rect = orb.el.getBoundingClientRect();
+            if (rect.left < 100 && rect.top < 100) {
+              console.warn(`⚠️  VISIBLE ORB IN TOP LEFT! Zone: ${orb.zoneName}, Expected: (${orb.screenX}, ${orb.screenY}), Actual: (${rect.left}, ${rect.top})`);
+              console.warn(`     Transform: ${orb.el.style.transform}`);
+              console.warn(`     Computed: ${window.getComputedStyle(orb.el).transform}`);
+            }
+          }, 50);
+          
         } else if (!shouldBeVisible && orb.visible) {
           orb.el.style.opacity = '0';
           orb.visible = false;
@@ -1156,7 +1183,13 @@
           
           const finalX = orb.screenX + orb.driftX;
           const finalY = orb.screenY + orb.driftY;
-          orb.el.style.transform = `translate(${finalX}px, ${finalY}px)`;
+          const newTransform = `translate(${finalX}px, ${finalY}px)`;
+          orb.el.style.transform = newTransform;
+          
+          // Log drift movement occasionally
+          if (Math.random() < 0.01) { // 1% chance
+            console.log(`🌊 Drift update: ${orb.zoneName} → ${newTransform}`);
+          }
         }
       });
     }
@@ -1219,11 +1252,6 @@
       if (motionCanvas) {
         motionCanvas.remove();
         motionCanvas = null;
-      }
-      
-      if (debugDisplay) {
-        debugDisplay.remove();
-        debugDisplay = null;
       }
       
       clearAllOrbs();
