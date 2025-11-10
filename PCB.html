@@ -1083,8 +1083,71 @@
       const ghostImage = document.createElement('img');
       ghostImage.id = sightingId;
       ghostImage.className = 'ghost-sighting';
-      ghostImage.src = event.image || './PCB/Ghosts/01.png'; // Default to 01.png
+      
+      // Determine the correct image path
+      let imagePath;
+      if (event.image) {
+        // If specific image provided, check if it includes path
+        if (event.image.includes('/') || event.image.includes('\\')) {
+          imagePath = event.image; // Full path provided
+        } else {
+          imagePath = `./PCB/Ghosts/${event.image}`; // Just filename provided
+        }
+      } else {
+        imagePath = './PCB/Ghosts/01.png'; // Default
+      }
+      
+      console.log(`Attempting to load ghost image from: ${imagePath}`);
+      ghostImage.src = imagePath;
       ghostImage.alt = 'Ghost Sighting';
+      
+      // Add error handling for image loading
+      ghostImage.onload = function() {
+        console.log(`✅ Ghost image loaded successfully: ${imagePath}`);
+      };
+      
+      ghostImage.onerror = function() {
+        console.error(`❌ Failed to load ghost image: ${imagePath}`);
+        console.log('Trying alternative paths...');
+        
+        // Try alternative paths
+        const alternativePaths = [
+          `./Games/PCB/Ghosts/${event.image || '01.png'}`,
+          `./Ghosts/${event.image || '01.png'}`,
+          `./PCB/${event.image || '01.png'}`,
+          `./assets/ghosts/${event.image || '01.png'}`,
+          `./${event.image || '01.png'}`
+        ];
+        
+        let pathIndex = 0;
+        const tryNextPath = () => {
+          if (pathIndex < alternativePaths.length) {
+            const nextPath = alternativePaths[pathIndex];
+            console.log(`Trying alternative path: ${nextPath}`);
+            pathIndex++;
+            
+            // Create a test image to check if path works
+            const testImg = new Image();
+            testImg.onload = () => {
+              console.log(`✅ Alternative path works: ${nextPath}`);
+              ghostImage.src = nextPath;
+            };
+            testImg.onerror = () => {
+              console.log(`❌ Alternative path failed: ${nextPath}`);
+              tryNextPath();
+            };
+            testImg.src = nextPath;
+          } else {
+            console.error('❌ All image paths failed. Please check:');
+            console.error('1. Image exists in PCB/Ghosts/ folder');
+            console.error('2. Filename is correct (case sensitive)');
+            console.error('3. Path is relative to HTML file location');
+            console.error('Current working directory:', window.location.href);
+          }
+        };
+        
+        tryNextPath();
+      };
       
       // Position the ghost randomly in a corner or background area
       const viewportRect = viewport.getBoundingClientRect();
