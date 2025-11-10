@@ -26,16 +26,11 @@
     },
     {
       "effect": "sighting",
-      "time": 0.5,
+      "time": 5.0,
       "image": "01.png",
-      "fade": true,
+      "blend_mode": "default", 
       "rush": true,
-      "size": "300px",
-      "duration": 2000,
-      "fade_delay": 500,
-      "rush_delay": 600,
-      "audio": "Poltergeist02.mp3",
-      "volume": "medium"
+      "audio": "scream.mp3"
     },
     {
       "effect": "emf_spike",
