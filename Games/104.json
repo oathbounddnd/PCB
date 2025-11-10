@@ -6,11 +6,7 @@
     "class": 3,
     "location": "dinning_room",
     "mobility": "stationary",
-    "evidence": [
-      "emf_level_5",
-      "spirit_box",
-      "ghost_orbs"
-    ]
+    "evidence": ["emf_level_5", "spirit_box", "ghost_orbs"]
   },
   "timeline": [
     {
@@ -20,38 +16,73 @@
     {
       "effect": "emf_spike",
       "time": 0.5,
-      "emf_spike": 6,
-      "duration": 6,
-      "audio": "Poltergeist01.ogg"
+      "emf_spike": 4.2,
+      "duration": 3,
+      "audio": "emf_static.mp3"
     },
     {
       "effect": "sighting",
-      "time": 0.2,
+      "time": 0.5,
       "image": "01.png",
-      "blend_mode": "default", 
-      "rush": true,
-      "audio": "scream.mp3"
+      "movement": "rush-at-camera",
+      "speed": "1s",
+      "blend_mode": "multiply",
+      "start_size": "0.8",
+      "end_size": "2",
+      "audio": "Poltergeist01.ogg",
+      "volume": "medium"
+    },
+    {
+      "effect": "sighting", 
+      "time": 3.0,
+      "image": "01.png",
+      "movement": "peek",
+      "speed": "4s",
+      "blend_mode": "soft-light",
+      "start_size": "1.0",
+      "mid_size": "1.3",
+      "end_size": "1.0",
+      "audio": "door_creak.mp3",
+      "volume": "quiet"
     },
     {
       "effect": "emf_spike",
-      "time": 12,
-      "emf_spike": 5.9,
-      "duration": 5,
-      "audio": "door_slam.mp3"
-    },
-    {
-      "effect": "emf_spike",
-      "time": 18,
-      "emf_spike": 5.3,
+      "time": 5.0,
+      "emf_spike": 5.1,
       "duration": 4,
       "audio": "heavy_breathing.mp3"
     },
     {
+      "effect": "sighting",
+      "time": 7.0,
+      "image": "01.png",
+      "movement": "rush-at-camera",
+      "speed": "3s",
+      "blend_mode": "multiply",
+      "start_size": "0.1",
+      "mid_size": "1.0",
+      "end_size": "3.0",
+      "audio": "deep_growl.mp3",
+      "volume": "loud"
+    },
+    {
       "effect": "emf_spike",
-      "time": 24,
+      "time": 10.0,
       "emf_spike": 5.8,
-      "duration": 6,
-      "audio": "angry_voice.mp3"
+      "duration": 5,
+      "audio": "door_slam.mp3"
+    },
+    {
+      "effect": "sighting",
+      "time": 12.0,
+      "image": "01.png", 
+      "movement": "rush-at-camera",
+      "speed": "1.5s",
+      "blend_mode": "default",
+      "start_size": "0.05",
+      "end_size": "4.0",
+      "audio": "scream_terror.mp3",
+      "volume": "loud"
     }
   ],
   "triggers": {}
