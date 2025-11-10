@@ -261,14 +261,52 @@
       z-index: 4;
       max-width: 150px;
       max-height: 150px;
+      
+      /* Blending effects for realistic appearance */
+      mix-blend-mode: overlay;
+      filter: blur(0.5px) contrast(0.8) brightness(0.7) saturate(0.6);
+      
+      /* Soft edges */
+      border-radius: 8px;
+      
+      /* Subtle shadow for depth */
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
     }
+    
     .ghost-sighting.visible {
-      opacity: 0.7;
+      opacity: 0.4; /* More subtle than before */
     }
+    
+    /* Different blend modes for variety */
+    .ghost-sighting.blend-multiply {
+      mix-blend-mode: multiply;
+      filter: blur(0.8px) contrast(1.2) brightness(0.5) saturate(0.4);
+      opacity: 0.6;
+    }
+    
+    .ghost-sighting.blend-screen {
+      mix-blend-mode: screen;
+      filter: blur(0.3px) contrast(0.6) brightness(1.2) saturate(0.3);
+      opacity: 0.3;
+    }
+    
+    .ghost-sighting.blend-soft-light {
+      mix-blend-mode: soft-light;
+      filter: blur(1px) contrast(0.9) brightness(0.8) saturate(0.5);
+      opacity: 0.5;
+    }
+    
+    .ghost-sighting.distant {
+      filter: blur(2px) contrast(0.6) brightness(0.4) saturate(0.3);
+      opacity: 0.25;
+      transform: scale(0.7);
+    }
+    
     .ghost-sighting.fade-out {
       opacity: 0;
       transition: opacity 2s ease-out;
     }
+    
     .ghost-sighting.rush {
       animation: ghostRush 1.5s ease-out forwards;
     }
@@ -276,15 +314,18 @@
     @keyframes ghostRush {
       0% {
         transform: scale(1);
-        opacity: 0.7;
+        opacity: 0.4;
+        filter: blur(0.5px) contrast(0.8) brightness(0.7);
       }
       50% {
-        transform: scale(1.2);
-        opacity: 0.9;
+        transform: scale(1.3);
+        opacity: 0.7;
+        filter: blur(0.2px) contrast(1.1) brightness(0.9);
       }
       100% {
-        transform: scale(3);
+        transform: scale(2.5);
         opacity: 0;
+        filter: blur(3px) contrast(1.5) brightness(1.2);
       }
     }
     .camera-viewport {
@@ -1084,6 +1125,27 @@
       ghostImage.id = sightingId;
       ghostImage.className = 'ghost-sighting';
       
+      // Apply blend mode based on event settings
+      const blendMode = event.blend_mode || 'default';
+      switch(blendMode.toLowerCase()) {
+        case 'multiply':
+          ghostImage.classList.add('blend-multiply');
+          break;
+        case 'screen':
+          ghostImage.classList.add('blend-screen');
+          break;
+        case 'soft-light':
+        case 'softlight':
+          ghostImage.classList.add('blend-soft-light');
+          break;
+        case 'distant':
+          ghostImage.classList.add('distant');
+          break;
+        default:
+          // Keep default overlay blend mode
+          break;
+      }
+      
       // Determine the correct image path
       let imagePath;
       if (event.image) {
@@ -1149,16 +1211,50 @@
         tryNextPath();
       };
       
-      // Position the ghost randomly in a corner or background area
+      // Enhanced positioning - prefer darker areas and corners
       const viewportRect = viewport.getBoundingClientRect();
-      const positions = [
-        { left: '5%', top: '10%' },    // Top left corner
-        { right: '5%', top: '10%' },   // Top right corner
-        { left: '5%', bottom: '20%' }, // Bottom left corner
-        { right: '5%', bottom: '20%' }, // Bottom right corner
-        { left: '15%', top: '30%' },   // Mid-left
-        { right: '15%', top: '30%' },  // Mid-right
-      ];
+      
+      // Different positioning sets for different moods
+      let positions;
+      const positionStyle = event.position_style || 'corners';
+      
+      switch(positionStyle.toLowerCase()) {
+        case 'background':
+          positions = [
+            { left: '8%', top: '15%' },
+            { right: '8%', top: '15%' },
+            { left: '20%', top: '40%' },
+            { right: '20%', top: '40%' },
+            { left: '12%', bottom: '30%' },
+            { right: '12%', bottom: '30%' }
+          ];
+          break;
+        case 'edges':
+          positions = [
+            { left: '2%', top: '50%' },
+            { right: '2%', top: '50%' },
+            { left: '50%', top: '5%' },
+            { left: '50%', bottom: '15%' }
+          ];
+          break;
+        case 'center':
+          positions = [
+            { left: '30%', top: '30%' },
+            { right: '30%', top: '30%' },
+            { left: '40%', top: '45%' },
+            { right: '35%', top: '35%' }
+          ];
+          break;
+        default: // 'corners'
+          positions = [
+            { left: '5%', top: '10%' },    // Top left corner
+            { right: '5%', top: '10%' },   // Top right corner
+            { left: '5%', bottom: '20%' }, // Bottom left corner
+            { right: '5%', bottom: '20%' }, // Bottom right corner
+            { left: '15%', top: '30%' },   // Mid-left
+            { right: '15%', top: '30%' },  // Mid-right
+          ];
+      }
       
       const position = positions[Math.floor(Math.random() * positions.length)];
       Object.assign(ghostImage.style, position);
@@ -1168,6 +1264,11 @@
       ghostImage.style.maxHeight = event.size || '120px';
       ghostImage.style.width = 'auto';
       ghostImage.style.height = 'auto';
+      
+      // Add custom opacity if specified
+      if (event.opacity) {
+        ghostImage.style.setProperty('--ghost-opacity', event.opacity);
+      }
       
       // Add to viewport
       viewport.appendChild(ghostImage);
@@ -1206,7 +1307,7 @@
         playGhostAudio(audioPath, event.volume || 'medium');
       }
       
-      console.log(`Ghost sighting created: ${sightingId}`, event);
+      console.log(`Ghost sighting created: ${sightingId} (blend: ${blendMode}, position: ${positionStyle})`, event);
     }
     
     function removeGhostSighting(sightingId) {
