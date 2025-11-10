@@ -26,7 +26,7 @@
     },
     {
       "effect": "sighting",
-      "time": 5.0,
+      "time": 0.2,
       "image": "01.png",
       "blend_mode": "default", 
       "rush": true,
